@@ -6,8 +6,11 @@ import com.alibaba.druid.sql.ast.*;
 import com.alibaba.druid.sql.ast.expr.*;
 import com.alibaba.druid.sql.ast.statement.*;
 import com.alibaba.druid.util.JdbcConstants;
+import com.github.osinn.druid.multi.tenant.plugin.handler.TenantInfoHandler;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.NumberUtils;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -17,6 +20,10 @@ import java.util.List;
  */
 @Slf4j
 public class DefaultSqlParser implements SqlParser {
+    /**
+     * 处理多租户信息处理器
+     */
+    private TenantInfoHandler tenantInfoHandler;
 
     @Override
     public String setTenantParameter(String sql) {
@@ -114,7 +121,7 @@ public class DefaultSqlParser implements SqlParser {
 
     @Override
     public void processInsert(SQLInsertStatement insert) {
-        insert.addColumn(new SQLIdentifierExpr("tenant_id"));
+        insert.addColumn(new SQLIdentifierExpr(this.tenantInfoHandler.getTenantIdColumn()));
         insert.getValuesList().forEach(valuesClause -> {
             valuesClause.addValue(11);
         });
@@ -220,7 +227,7 @@ public class DefaultSqlParser implements SqlParser {
 //
 //        // 拼接新的条件
 //        binaryOpExprWhere.setOperator(SQLBinaryOperator.Equality);
-//        binaryOpExprWhere.setLeft(new SQLIdentifierExpr("tenant_id"));
+//        binaryOpExprWhere.setLeft(new SQLIdentifierExpr(this.tenantInfoHandler.getTenantIdColumn()));
 //        // 设置当前租户ID条件
 //        binaryOpExprWhere.setRight(new SQLIntegerExpr(11));
 //
@@ -248,43 +255,6 @@ public class DefaultSqlParser implements SqlParser {
             return this.getTenantCondition(alias);
         }
     }
-//
-//    public static SQLExpr createNewWhereCondition(SQLExpr expr, String alias, String columnName, List<String> list) {
-//        // 如果是表达式
-//        if (expr instanceof SQLBinaryOpExpr) {
-//            // 构建新的 SQLBinaryOpExpr
-//            SQLBinaryOpExpr sqlBinaryOpExpr = new SQLBinaryOpExpr();
-//            sqlBinaryOpExpr.setOperator(SQLBinaryOperator.BooleanAnd);
-//            sqlBinaryOpExpr.setParent(expr.getParent());
-//            // 将左边设置成原来的
-//            sqlBinaryOpExpr.setLeft(expr);
-//            SQLInListExpr sqlInListExpr;
-//            if (alias == null) {
-//                // 如果没有别名，则直接列名
-//                SQLIdentifierExpr sqlIdentifierExpr = new SQLIdentifierExpr(columnName);
-//                sqlInListExpr = new SQLInListExpr(sqlIdentifierExpr);
-//                sqlIdentifierExpr.setParent(sqlInListExpr);
-//            } else {
-//                // 如果有别名，则构造别名表达式
-//                SQLIdentifierExpr sqlIdentifierExpr = new SQLIdentifierExpr(alias);
-//                SQLPropertyExpr sqlPropertyExpr = new SQLPropertyExpr(sqlIdentifierExpr, columnName);
-//                sqlIdentifierExpr.setParent(sqlPropertyExpr);
-//                sqlInListExpr = new SQLInListExpr(sqlPropertyExpr);
-//            }
-//            // 构造 in 内包含的东西
-//            List<SQLExpr> refExprList = new ArrayList<>();
-//            for (int i = 0; i < list.size(); i++) {
-//                SQLCharExpr sqlCharExpr = new SQLCharExpr(list.get(i));
-//                sqlCharExpr.setParent(expr.getParent());
-//                refExprList.add(sqlCharExpr);
-//            }
-//            sqlInListExpr.setTargetList(refExprList);
-//            sqlBinaryOpExpr.setRight(sqlInListExpr);
-//            // 返回新的条件
-//            return sqlBinaryOpExpr;
-//        }
-//        return expr;
-//    }
 
     /**
      * 处理in条件查询
@@ -317,24 +287,76 @@ public class DefaultSqlParser implements SqlParser {
 //        if (isContainsTenantIdCondition(sqlExpr)) {
 //            return null;
 //        }
+        List<Object> tenantIds = this.tenantInfoHandler.getTenantIds();
+        if (tenantIds.size() == 1) {
+            return getEqualityCondition(alias, tenantIds.get(0));
+        } else {
+            return getInCondition(alias, tenantIds);
+        }
+    }
+
+    private SQLBinaryOpExpr getEqualityCondition(String alias, Object tenantId) {
         SQLBinaryOpExpr tenantIdWhere = new SQLBinaryOpExpr();
         SQLPropertyExpr leftExpr = new SQLPropertyExpr();
+        String tenantIdColumn = this.tenantInfoHandler.getTenantIdColumn();
+        SQLExpr expr;
+        if (tenantId instanceof Number) {
+            expr = new SQLBigIntExpr(NumberUtils.parseNumber(tenantId + "", Long.class));
+        } else {
+            expr = new SQLCharExpr(tenantId + "");
+        }
         if (alias != null) {
             leftExpr.setOwner(alias);
-            leftExpr.setName("tenant_id");
+            leftExpr.setName(tenantIdColumn);
             tenantIdWhere.setLeft(leftExpr);
-            SQLIntegerExpr rightExpr = new SQLIntegerExpr();
-            rightExpr.setNumber(11);
-            tenantIdWhere.setRight(rightExpr);
+//            SQLIntegerExpr rightExpr = new SQLIntegerExpr();
+//            rightExpr.setNumber(11);
+            tenantIdWhere.setRight(expr);
             tenantIdWhere.setOperator(SQLBinaryOperator.Equality);
         } else {
             // 拼接新的条件
             tenantIdWhere.setOperator(SQLBinaryOperator.Equality);
-            tenantIdWhere.setLeft(new SQLIdentifierExpr("tenant_id"));
+            tenantIdWhere.setLeft(new SQLIdentifierExpr(tenantIdColumn));
             // 设置当前租户ID条件
-            tenantIdWhere.setRight(new SQLIntegerExpr(11));
+            tenantIdWhere.setRight(expr);
         }
         return tenantIdWhere;
+    }
+
+
+    public SQLBinaryOpExpr getInCondition(String alias, List<Object> tenantIds) {
+        // 构建新的 SQLBinaryOpExpr
+        SQLBinaryOpExpr sqlBinaryOpExpr = new SQLBinaryOpExpr();
+        sqlBinaryOpExpr.setOperator(SQLBinaryOperator.BooleanAnd);
+        String tenantIdColumn = this.tenantInfoHandler.getTenantIdColumn();
+        SQLInListExpr sqlInListExpr;
+        if (alias == null) {
+            // 如果没有别名，则直接列名
+            SQLIdentifierExpr sqlIdentifierExpr = new SQLIdentifierExpr(tenantIdColumn);
+            sqlInListExpr = new SQLInListExpr(sqlIdentifierExpr);
+            sqlIdentifierExpr.setParent(sqlInListExpr);
+        } else {
+            // 如果有别名，则构造别名表达式
+            SQLIdentifierExpr sqlIdentifierExpr = new SQLIdentifierExpr(alias);
+            SQLPropertyExpr sqlPropertyExpr = new SQLPropertyExpr(sqlIdentifierExpr, tenantIdColumn);
+            sqlIdentifierExpr.setParent(sqlPropertyExpr);
+            sqlInListExpr = new SQLInListExpr(sqlPropertyExpr);
+        }
+        // 构造 in 内包含的东西
+        List<SQLExpr> refExprList = new ArrayList<>();
+        for (Object value : tenantIds) {
+            if (value instanceof Number) {
+                SQLBigIntExpr rightExpr = new SQLBigIntExpr(NumberUtils.parseNumber(value + "", Long.class));
+                refExprList.add(rightExpr);
+            } else {
+                SQLCharExpr sqlCharExpr = new SQLCharExpr(value + "");
+                refExprList.add(sqlCharExpr);
+            }
+        }
+        sqlInListExpr.setTargetList(refExprList);
+        sqlBinaryOpExpr.setRight(sqlInListExpr);
+        // 返回新的条件
+        return sqlBinaryOpExpr;
     }
 
     /**
@@ -352,8 +374,8 @@ public class DefaultSqlParser implements SqlParser {
         SQLExpr right = binaryOpExpr.getRight();
         // 是否包含tenant_id 为查询条件
         if (!(left instanceof SQLBinaryOpExpr) && !(right instanceof SQLBinaryOpExpr)
-                && ("tenant_id".equals(String.valueOf(left))
-                || "tenant_id".equals(String.valueOf(right)))) {
+                && (this.tenantInfoHandler.getTenantIdColumn().equals(String.valueOf(left))
+                || this.tenantInfoHandler.getTenantIdColumn().equals(String.valueOf(right)))) {
             return true;
         }
         return false;
@@ -404,5 +426,9 @@ public class DefaultSqlParser implements SqlParser {
         } else {
             return null;
         }
+    }
+
+    public void setTenantInfoHandler(TenantInfoHandler tenantInfoHandler) {
+        this.tenantInfoHandler = tenantInfoHandler;
     }
 }

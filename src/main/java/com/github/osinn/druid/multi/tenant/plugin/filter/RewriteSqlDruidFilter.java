@@ -9,7 +9,8 @@ import com.github.osinn.druid.multi.tenant.plugin.parser.DefaultSqlParser;
 import java.sql.SQLException;
 
 /**
- * 基于druid连接池过滤器修改sql
+ * 后面删除
+ * 基于druid连接池过滤器修改sql，⚠️如果是Mybatis 打印执行的sql不是修改后的sql
  * <p>
  *     @ConfigurationProperties("spring.datasource")
  *     @Bean(initMethod = "init", destroyMethod = "close")
@@ -26,6 +27,7 @@ import java.sql.SQLException;
  *
  * @author wency_cai
  */
+@Deprecated
 public class RewriteSqlDruidFilter extends FilterEventAdapter {
 
     private static final DefaultSqlParser DEFAULT_SQL_PARSER = new DefaultSqlParser();
