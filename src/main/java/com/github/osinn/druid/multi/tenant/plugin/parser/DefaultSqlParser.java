@@ -8,10 +8,9 @@ import com.alibaba.druid.sql.ast.statement.*;
 import com.alibaba.druid.util.JdbcConstants;
 import com.github.osinn.druid.multi.tenant.plugin.handler.TenantInfoHandler;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.util.NumberUtils;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.TimeZone;
 
 /**
  * sql解析器实现
@@ -92,7 +91,7 @@ public class DefaultSqlParser implements SqlParser {
 
                 this.joinCondition(left);
                 this.joinCondition(right);
-                SQLBinaryOpExpr tenantCondition = getTenantCondition(right.getAlias());
+                SQLExpr tenantCondition = getTenantCondition(right.getAlias());
                 joinTable.addCondition(tenantCondition);
                 SQLExpr condition = joinTable.getCondition();
                 // 处理where 语句中多个in条件
@@ -121,10 +120,13 @@ public class DefaultSqlParser implements SqlParser {
 
     @Override
     public void processInsert(SQLInsertStatement insert) {
+        List<Object> tenantIds = this.tenantInfoHandler.getTenantIds();
+        if (tenantIds == null || tenantIds.size() == 0) {
+            return;
+        }
         insert.addColumn(new SQLIdentifierExpr(this.tenantInfoHandler.getTenantIdColumn()));
-        insert.getValuesList().forEach(valuesClause -> {
-            valuesClause.addValue(11);
-        });
+        Object tenantId = tenantIds.get(0);
+        insert.getValuesList().forEach(valuesClause -> valuesClause.addValue(tenantId));
     }
 
     @Override
@@ -137,7 +139,7 @@ public class DefaultSqlParser implements SqlParser {
             SQLTableSource right = joinTable.getRight();
             this.joinCondition(left);
             this.joinCondition(right);
-            SQLBinaryOpExpr tenantCondition = getTenantCondition(right.getAlias());
+            SQLExpr tenantCondition = getTenantCondition(right.getAlias());
             joinTable.addCondition(tenantCondition);
 
             SQLExpr condition = joinTable.getCondition();
@@ -149,7 +151,7 @@ public class DefaultSqlParser implements SqlParser {
                 alias = left.getAlias();
             }
         }
-        SQLBinaryOpExpr tenantCondition = getTenantCondition(alias);
+        SQLExpr tenantCondition = getTenantCondition(alias);
         update.addCondition(tenantCondition);
         SQLExpr where = update.getWhere();
         // 处理where 语句中多个in条件
@@ -167,7 +169,7 @@ public class DefaultSqlParser implements SqlParser {
             SQLTableSource right = joinTable.getRight();
             this.joinCondition(left);
             this.joinCondition(right);
-            SQLBinaryOpExpr tenantCondition = getTenantCondition(right.getAlias());
+            SQLExpr tenantCondition = getTenantCondition(right.getAlias());
             joinTable.addCondition(tenantCondition);
             SQLExpr condition = joinTable.getCondition();
             // 处理where 语句中多个in条件
@@ -180,7 +182,7 @@ public class DefaultSqlParser implements SqlParser {
             }
         }
 
-        SQLBinaryOpExpr tenantCondition = getTenantCondition(alias);
+        SQLExpr tenantCondition = getTenantCondition(alias);
         delete.addCondition(tenantCondition);
         SQLExpr where = delete.getWhere();
         // 处理where 语句中多个in条件
@@ -196,7 +198,7 @@ public class DefaultSqlParser implements SqlParser {
     private void joinCondition(SQLTableSource sqlTableSource) {
         if (sqlTableSource instanceof SQLJoinTableSource) {
             SQLJoinTableSource sqlJoinTableSource = (SQLJoinTableSource) sqlTableSource;
-            SQLBinaryOpExpr tenantCondition = getTenantCondition(sqlJoinTableSource.getRight().getAlias());
+            SQLExpr tenantCondition = getTenantCondition(sqlJoinTableSource.getRight().getAlias());
             sqlJoinTableSource.addCondition(tenantCondition);
 
             SQLTableSource left = sqlJoinTableSource.getLeft();
@@ -211,33 +213,6 @@ public class DefaultSqlParser implements SqlParser {
         }
     }
 
-    /**
-     * 添加where条件
-     *
-     * @return 修改后的where条件
-     */
-//    private SQLExpr getNewWhereCondition(SQLExpr where) {
-//        // 如果where中包含子查询
-//        if (where instanceof SQLInSubQueryExpr) {
-//            SQLSelect subSelect = ((SQLInSubQueryExpr) where).subQuery;
-//            // 处理子查询语句
-//            processSelectBody(subSelect.getQueryBlock());
-//        }
-//        SQLBinaryOpExpr binaryOpExprWhere = new SQLBinaryOpExpr();
-//
-//        // 拼接新的条件
-//        binaryOpExprWhere.setOperator(SQLBinaryOperator.Equality);
-//        binaryOpExprWhere.setLeft(new SQLIdentifierExpr(this.tenantInfoHandler.getTenantIdColumn()));
-//        // 设置当前租户ID条件
-//        binaryOpExprWhere.setRight(new SQLIntegerExpr(11));
-//
-//
-//        binaryOpExprWhere.setRight(where.clone());
-//        if (isTenantIdAndOrCondition(where)) {
-//
-//        }
-//        return binaryOpExprWhere;
-//    }
     private SQLExpr createNewWhereCondition(SQLExpr where, String alias) {
         // 如果是表达式
         if (where != null) {
@@ -247,7 +222,7 @@ public class DefaultSqlParser implements SqlParser {
             sqlBinaryOpExpr.setParent(where.getParent());
             // 将左边设置成原来的
             sqlBinaryOpExpr.setLeft(where);
-            SQLBinaryOpExpr tenantCondition = this.getTenantCondition(alias);
+            SQLExpr tenantCondition = this.getTenantCondition(alias);
             sqlBinaryOpExpr.setRight(tenantCondition);
             // 返回新的条件
             return sqlBinaryOpExpr;
@@ -268,7 +243,7 @@ public class DefaultSqlParser implements SqlParser {
         if (sqlExpr instanceof SQLInSubQueryExpr) {
             SQLSelectQueryBlock selectQueryBlock = ((SQLInSubQueryExpr) sqlExpr).getSubQuery().getQueryBlock();
             if (selectQueryBlock != null) {
-                SQLBinaryOpExpr tenantCondition = getTenantCondition(selectQueryBlock.getFrom().getAlias());
+                SQLExpr tenantCondition = getTenantCondition(selectQueryBlock.getFrom().getAlias());
                 selectQueryBlock.addCondition(tenantCondition);
             }
         } else if (sqlExpr instanceof SQLBinaryOpExpr) {
@@ -283,7 +258,7 @@ public class DefaultSqlParser implements SqlParser {
      * @param alias 表别名
      * @return 返回条件
      */
-    private SQLBinaryOpExpr getTenantCondition(String alias) {
+    private SQLExpr getTenantCondition(String alias) {
 //        if (isContainsTenantIdCondition(sqlExpr)) {
 //            return null;
 //        }
@@ -291,7 +266,7 @@ public class DefaultSqlParser implements SqlParser {
         if (tenantIds.size() == 1) {
             return getEqualityCondition(alias, tenantIds.get(0));
         } else {
-            return getInCondition(alias, tenantIds);
+            return conditionIn(alias, tenantIds);
         }
     }
 
@@ -299,18 +274,11 @@ public class DefaultSqlParser implements SqlParser {
         SQLBinaryOpExpr tenantIdWhere = new SQLBinaryOpExpr();
         SQLPropertyExpr leftExpr = new SQLPropertyExpr();
         String tenantIdColumn = this.tenantInfoHandler.getTenantIdColumn();
-        SQLExpr expr;
-        if (tenantId instanceof Number) {
-            expr = new SQLBigIntExpr(NumberUtils.parseNumber(tenantId + "", Long.class));
-        } else {
-            expr = new SQLCharExpr(tenantId + "");
-        }
+        SQLExpr expr = SQLExprUtils.fromJavaObject(tenantId, TimeZone.getDefault());
         if (alias != null) {
             leftExpr.setOwner(alias);
             leftExpr.setName(tenantIdColumn);
             tenantIdWhere.setLeft(leftExpr);
-//            SQLIntegerExpr rightExpr = new SQLIntegerExpr();
-//            rightExpr.setNumber(11);
             tenantIdWhere.setRight(expr);
             tenantIdWhere.setOperator(SQLBinaryOperator.Equality);
         } else {
@@ -323,40 +291,21 @@ public class DefaultSqlParser implements SqlParser {
         return tenantIdWhere;
     }
 
-
-    public SQLBinaryOpExpr getInCondition(String alias, List<Object> tenantIds) {
-        // 构建新的 SQLBinaryOpExpr
-        SQLBinaryOpExpr sqlBinaryOpExpr = new SQLBinaryOpExpr();
-        sqlBinaryOpExpr.setOperator(SQLBinaryOperator.BooleanAnd);
-        String tenantIdColumn = this.tenantInfoHandler.getTenantIdColumn();
-        SQLInListExpr sqlInListExpr;
-        if (alias == null) {
-            // 如果没有别名，则直接列名
-            SQLIdentifierExpr sqlIdentifierExpr = new SQLIdentifierExpr(tenantIdColumn);
-            sqlInListExpr = new SQLInListExpr(sqlIdentifierExpr);
-            sqlIdentifierExpr.setParent(sqlInListExpr);
-        } else {
+    private SQLInListExpr conditionIn(String alias, List<Object> tenantIds) {
+        TimeZone timeZone = TimeZone.getDefault();
+        if (alias != null) {
             // 如果有别名，则构造别名表达式
             SQLIdentifierExpr sqlIdentifierExpr = new SQLIdentifierExpr(alias);
-            SQLPropertyExpr sqlPropertyExpr = new SQLPropertyExpr(sqlIdentifierExpr, tenantIdColumn);
+            SQLPropertyExpr sqlPropertyExpr = new SQLPropertyExpr(sqlIdentifierExpr, this.tenantInfoHandler.getTenantIdColumn());
             sqlIdentifierExpr.setParent(sqlPropertyExpr);
-            sqlInListExpr = new SQLInListExpr(sqlPropertyExpr);
-        }
-        // 构造 in 内包含的东西
-        List<SQLExpr> refExprList = new ArrayList<>();
-        for (Object value : tenantIds) {
-            if (value instanceof Number) {
-                SQLBigIntExpr rightExpr = new SQLBigIntExpr(NumberUtils.parseNumber(value + "", Long.class));
-                refExprList.add(rightExpr);
-            } else {
-                SQLCharExpr sqlCharExpr = new SQLCharExpr(value + "");
-                refExprList.add(sqlCharExpr);
+            SQLInListExpr sqlInListExpr = new SQLInListExpr(sqlPropertyExpr);
+            for (Object value : tenantIds) {
+                sqlInListExpr.addTarget(SQLExprUtils.fromJavaObject(value, timeZone));
             }
+            return sqlInListExpr;
+        } else {
+            return SQLExprUtils.conditionIn(this.tenantInfoHandler.getTenantIdColumn(), tenantIds, timeZone);
         }
-        sqlInListExpr.setTargetList(refExprList);
-        sqlBinaryOpExpr.setRight(sqlInListExpr);
-        // 返回新的条件
-        return sqlBinaryOpExpr;
     }
 
     /**
