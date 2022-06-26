@@ -10,7 +10,6 @@ import com.github.osinn.druid.multi.tenant.plugin.handler.TenantInfoHandler;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
-import java.util.TimeZone;
 
 /**
  * sql解析器实现
@@ -91,8 +90,10 @@ public class DefaultSqlParser implements SqlParser {
 
                 this.joinCondition(left);
                 this.joinCondition(right);
-                SQLExpr tenantCondition = getTenantCondition(right.getAlias());
-                joinTable.addCondition(tenantCondition);
+                SQLExpr tenantCondition = getTenantCondition(right.getAlias(), joinTable.getCondition());
+                if (tenantCondition != null) {
+                    joinTable.addCondition(tenantCondition);
+                }
                 SQLExpr condition = joinTable.getCondition();
                 // 处理where 语句中多个in条件
                 this.whereIn(condition);
@@ -139,8 +140,10 @@ public class DefaultSqlParser implements SqlParser {
             SQLTableSource right = joinTable.getRight();
             this.joinCondition(left);
             this.joinCondition(right);
-            SQLExpr tenantCondition = getTenantCondition(right.getAlias());
-            joinTable.addCondition(tenantCondition);
+            SQLExpr tenantCondition = getTenantCondition(right.getAlias(), joinTable.getCondition());
+            if (tenantCondition != null) {
+                joinTable.addCondition(tenantCondition);
+            }
 
             SQLExpr condition = joinTable.getCondition();
             // 处理where 语句中多个in条件
@@ -151,8 +154,10 @@ public class DefaultSqlParser implements SqlParser {
                 alias = left.getAlias();
             }
         }
-        SQLExpr tenantCondition = getTenantCondition(alias);
-        update.addCondition(tenantCondition);
+        SQLExpr tenantCondition = getTenantCondition(alias, update.getWhere());
+        if (tenantCondition != null) {
+            update.addCondition(tenantCondition);
+        }
         SQLExpr where = update.getWhere();
         // 处理where 语句中多个in条件
         this.whereIn(where);
@@ -169,8 +174,10 @@ public class DefaultSqlParser implements SqlParser {
             SQLTableSource right = joinTable.getRight();
             this.joinCondition(left);
             this.joinCondition(right);
-            SQLExpr tenantCondition = getTenantCondition(right.getAlias());
-            joinTable.addCondition(tenantCondition);
+            SQLExpr tenantCondition = getTenantCondition(right.getAlias(), joinTable.getCondition());
+            if (tenantCondition != null) {
+                joinTable.addCondition(tenantCondition);
+            }
             SQLExpr condition = joinTable.getCondition();
             // 处理where 语句中多个in条件
             this.whereIn(condition);
@@ -182,8 +189,10 @@ public class DefaultSqlParser implements SqlParser {
             }
         }
 
-        SQLExpr tenantCondition = getTenantCondition(alias);
-        delete.addCondition(tenantCondition);
+        SQLExpr tenantCondition = getTenantCondition(alias, delete.getWhere());
+        if (tenantCondition != null) {
+            delete.addCondition(tenantCondition);
+        }
         SQLExpr where = delete.getWhere();
         // 处理where 语句中多个in条件
         this.whereIn(where);
@@ -198,8 +207,11 @@ public class DefaultSqlParser implements SqlParser {
     private void joinCondition(SQLTableSource sqlTableSource) {
         if (sqlTableSource instanceof SQLJoinTableSource) {
             SQLJoinTableSource sqlJoinTableSource = (SQLJoinTableSource) sqlTableSource;
-            SQLExpr tenantCondition = getTenantCondition(sqlJoinTableSource.getRight().getAlias());
-            sqlJoinTableSource.addCondition(tenantCondition);
+            SQLExpr tenantCondition = getTenantCondition(sqlJoinTableSource.getRight().getAlias(), sqlJoinTableSource.getCondition());
+
+            if (tenantCondition != null) {
+                sqlJoinTableSource.addCondition(tenantCondition);
+            }
 
             SQLTableSource left = sqlJoinTableSource.getLeft();
             SQLTableSource right = sqlJoinTableSource.getRight();
@@ -216,18 +228,21 @@ public class DefaultSqlParser implements SqlParser {
     private SQLExpr createNewWhereCondition(SQLExpr where, String alias) {
         // 如果是表达式
         if (where != null) {
+            SQLExpr tenantCondition = this.getTenantCondition(alias, where);
+            if (tenantCondition == null) {
+                return where;
+            }
             // 构建新的 SQLBinaryOpExpr
             SQLBinaryOpExpr sqlBinaryOpExpr = new SQLBinaryOpExpr();
             sqlBinaryOpExpr.setOperator(SQLBinaryOperator.BooleanAnd);
             sqlBinaryOpExpr.setParent(where.getParent());
             // 将左边设置成原来的
             sqlBinaryOpExpr.setLeft(where);
-            SQLExpr tenantCondition = this.getTenantCondition(alias);
             sqlBinaryOpExpr.setRight(tenantCondition);
             // 返回新的条件
             return sqlBinaryOpExpr;
         } else {
-            return this.getTenantCondition(alias);
+            return this.getTenantCondition(alias, where);
         }
     }
 
@@ -237,18 +252,18 @@ public class DefaultSqlParser implements SqlParser {
      * @param sqlExpr
      */
     private void whereIn(SQLExpr sqlExpr) {
-        if (isContainsTenantIdCondition(sqlExpr)) {
-            return;
-        }
         if (sqlExpr instanceof SQLInSubQueryExpr) {
             SQLSelectQueryBlock selectQueryBlock = ((SQLInSubQueryExpr) sqlExpr).getSubQuery().getQueryBlock();
             if (selectQueryBlock != null) {
-                SQLExpr tenantCondition = getTenantCondition(selectQueryBlock.getFrom().getAlias());
-                selectQueryBlock.addCondition(tenantCondition);
+                SQLExpr tenantCondition = getTenantCondition(selectQueryBlock.getFrom().getAlias(), selectQueryBlock.getWhere());
+                if (tenantCondition != null) {
+                    selectQueryBlock.addCondition(tenantCondition);
+                }
             }
         } else if (sqlExpr instanceof SQLBinaryOpExpr) {
-            this.whereIn(((SQLBinaryOpExpr) sqlExpr).getLeft());
-            this.whereIn(((SQLBinaryOpExpr) sqlExpr).getRight());
+            SQLBinaryOpExpr sqlBinaryOpExpr = (SQLBinaryOpExpr) sqlExpr;
+            this.whereIn(sqlBinaryOpExpr.getLeft());
+            this.whereIn(sqlBinaryOpExpr.getRight());
         }
     }
 
@@ -258,23 +273,25 @@ public class DefaultSqlParser implements SqlParser {
      * @param alias 表别名
      * @return 返回条件
      */
-    private SQLExpr getTenantCondition(String alias) {
-//        if (isContainsTenantIdCondition(sqlExpr)) {
-//            return null;
-//        }
+    private SQLExpr getTenantCondition(String alias, SQLExpr condition) {
+        if (isContainsTenantIdCondition(condition)) {
+            return null;
+        }
         List<Object> tenantIds = this.tenantInfoHandler.getTenantIds();
         if (tenantIds.size() == 1) {
-            return getEqualityCondition(alias, tenantIds.get(0));
-        } else {
+            return conditionEquality(alias, tenantIds.get(0));
+        } else if (tenantIds.size() > 1) {
             return conditionIn(alias, tenantIds);
+        } else {
+            return null;
         }
     }
 
-    private SQLBinaryOpExpr getEqualityCondition(String alias, Object tenantId) {
+    private SQLBinaryOpExpr conditionEquality(String alias, Object tenantId) {
         SQLBinaryOpExpr tenantIdWhere = new SQLBinaryOpExpr();
         SQLPropertyExpr leftExpr = new SQLPropertyExpr();
         String tenantIdColumn = this.tenantInfoHandler.getTenantIdColumn();
-        SQLExpr expr = SQLExprUtils.fromJavaObject(tenantId, TimeZone.getDefault());
+        SQLExpr expr = SQLExprUtils.fromJavaObject(tenantId, null);
         if (alias != null) {
             leftExpr.setOwner(alias);
             leftExpr.setName(tenantIdColumn);
@@ -292,7 +309,6 @@ public class DefaultSqlParser implements SqlParser {
     }
 
     private SQLInListExpr conditionIn(String alias, List<Object> tenantIds) {
-        TimeZone timeZone = TimeZone.getDefault();
         if (alias != null) {
             // 如果有别名，则构造别名表达式
             SQLIdentifierExpr sqlIdentifierExpr = new SQLIdentifierExpr(alias);
@@ -300,11 +316,11 @@ public class DefaultSqlParser implements SqlParser {
             sqlIdentifierExpr.setParent(sqlPropertyExpr);
             SQLInListExpr sqlInListExpr = new SQLInListExpr(sqlPropertyExpr);
             for (Object value : tenantIds) {
-                sqlInListExpr.addTarget(SQLExprUtils.fromJavaObject(value, timeZone));
+                sqlInListExpr.addTarget(SQLExprUtils.fromJavaObject(value, null));
             }
             return sqlInListExpr;
         } else {
-            return SQLExprUtils.conditionIn(this.tenantInfoHandler.getTenantIdColumn(), tenantIds, timeZone);
+            return SQLExprUtils.conditionIn(this.tenantInfoHandler.getTenantIdColumn(), tenantIds, null);
         }
     }
 
@@ -322,31 +338,31 @@ public class DefaultSqlParser implements SqlParser {
         SQLExpr left = binaryOpExpr.getLeft();
         SQLExpr right = binaryOpExpr.getRight();
         // 是否包含tenant_id 为查询条件
-        if (!(left instanceof SQLBinaryOpExpr) && !(right instanceof SQLBinaryOpExpr)
-                && (this.tenantInfoHandler.getTenantIdColumn().equals(String.valueOf(left))
-                || this.tenantInfoHandler.getTenantIdColumn().equals(String.valueOf(right)))) {
-            return true;
+        boolean isContainsTenantIdCondition = false;
+        if (left instanceof SQLBinaryOpExpr || left instanceof SQLPropertyExpr) {
+            isContainsTenantIdCondition = String.valueOf(left).contains(this.tenantInfoHandler.getTenantIdColumn());
         }
-        return false;
+        if (right instanceof SQLBinaryOpExpr) {
+            isContainsTenantIdCondition = String.valueOf(right).contains(this.tenantInfoHandler.getTenantIdColumn());
+        }
+        return isContainsTenantIdCondition;
     }
 
-    /**
-     * 是否包括 or tenant_id = xx的条件
-     *
-     * @param where sql中where条件语句
-     * @return 判断结果
-     */
-    private boolean isTenantIdAndOrCondition(SQLExpr where) {
-        if (!(where instanceof SQLBinaryOpExpr)) {
+    private boolean ignoreTable(String tableName) {
+        if (tableName == null) {
             return false;
         }
-        SQLBinaryOpExpr binaryOpExpr = (SQLBinaryOpExpr) where;
-        if ((isContainsTenantIdCondition(binaryOpExpr.getLeft())
-                || isContainsTenantIdCondition(binaryOpExpr.getRight()))
-                && "BooleanOr".equals(String.valueOf(binaryOpExpr.getOperator()))) {
-            return true;
+        List<String> ignoreTableNames = tenantInfoHandler.ignoreTablePrefix();
+
+        if (ignoreTableNames == null || ignoreTableNames.size() == 0) {
+            return false;
         }
-        return isTenantIdAndOrCondition(binaryOpExpr.getLeft()) || isTenantIdAndOrCondition(binaryOpExpr.getRight());
+        for (String ignoreTableName : ignoreTableNames) {
+            if (tableName.contains(ignoreTableName)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
