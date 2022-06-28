@@ -17,7 +17,7 @@ import java.util.List;
  */
 @Configuration
 @EnableConfigurationProperties(TenantProperties.class)
-@ConditionalOnProperty(value = TenantProperties.PREFIX + ".mybatis-enable", havingValue = "true")
+@ConditionalOnProperty(value = TenantProperties.PREFIX + ".enable", havingValue = "true")
 public class MybatisMultiTenantAutoConfigure {
 
     @Bean

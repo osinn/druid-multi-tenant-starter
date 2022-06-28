@@ -1,11 +1,9 @@
 package com.github.osinn.druid.multi.tenant.plugin.parser;
 
-import com.alibaba.druid.DbType;
 import com.alibaba.druid.sql.SQLUtils;
 import com.alibaba.druid.sql.ast.*;
 import com.alibaba.druid.sql.ast.expr.*;
 import com.alibaba.druid.sql.ast.statement.*;
-import com.alibaba.druid.util.JdbcConstants;
 import com.github.osinn.druid.multi.tenant.plugin.handler.TenantInfoHandler;
 import lombok.extern.slf4j.Slf4j;
 
@@ -25,10 +23,8 @@ public class DefaultSqlParser implements SqlParser {
 
     @Override
     public String setTenantParameter(String sql) {
-        DbType mysql = JdbcConstants.MYSQL;
-        List<SQLStatement> statementList = SQLUtils.parseStatements(sql, mysql);
+        List<SQLStatement> statementList = SQLUtils.parseStatements(sql, tenantInfoHandler.getDbType());
         SQLStatement statement = statementList.get(0);
-
         if (statement instanceof SQLSelectStatement) {
             SQLSelectStatement sqlSelectStatement = (SQLSelectStatement) statement;
             processSelectBody(sqlSelectStatement.getSelect().getQuery());
@@ -69,18 +65,19 @@ public class DefaultSqlParser implements SqlParser {
             SQLTableSource table = sqlSelectQueryBlock.getFrom();
             if (table instanceof SQLExprTableSource) {
                 SQLTableSource from = sqlSelectQueryBlock.getFrom();
-//                boolean containsTenantIdCondition = isContainsTenantIdCondition(where);
 
                 SQLExpr where = sqlSelectQueryBlock.getWhere();
-
-//                SQLBinaryOpExpr tenantCondition = getTenantCondition(from.getAlias());
-//                sqlSelectQueryBlock.addCondition(tenantCondition);
 
                 // 处理where 语句中多个in条件
                 this.whereIn(where);
                 String alias = this.getAlias(from);
                 // 构造新的 where
-                SQLExpr newWhereCondition = this.createNewWhereCondition(where, alias);
+                String tableName = null;
+                if (from instanceof SQLExprTableSource) {
+                    SQLExprTableSource sqlExprTableSource = (SQLExprTableSource) from;
+                    tableName = sqlExprTableSource.getExpr().toString();
+                }
+                SQLExpr newWhereCondition = this.createNewWhereCondition(tableName, where, alias);
                 sqlSelectQueryBlock.setWhere(newWhereCondition);
 
             } else if (table instanceof SQLJoinTableSource) {
@@ -90,7 +87,13 @@ public class DefaultSqlParser implements SqlParser {
 
                 this.joinCondition(left);
                 this.joinCondition(right);
-                SQLExpr tenantCondition = getTenantCondition(right.getAlias(), joinTable.getCondition());
+                String tableName = null;
+                if (right instanceof SQLExprTableSource) {
+                    SQLExprTableSource sqlExprTableSource = (SQLExprTableSource) right;
+                    tableName = sqlExprTableSource.getExpr().toString();
+                }
+
+                SQLExpr tenantCondition = getTenantCondition(tableName, right.getAlias(), joinTable.getCondition());
                 if (tenantCondition != null) {
                     joinTable.addCondition(tenantCondition);
                 }
@@ -102,7 +105,22 @@ public class DefaultSqlParser implements SqlParser {
 
                 // 构造新的 where
                 SQLExpr where = sqlSelectQueryBlock.getWhere();
-                SQLExpr newWhereCondition = this.createNewWhereCondition(where, alias);
+
+                if (sqlSelectQueryBlock.getFrom() instanceof SQLExprTableSource) {
+                    SQLExprTableSource sqlExprTableSource = (SQLExprTableSource) sqlSelectQueryBlock.getFrom();
+                    tableName = sqlExprTableSource.getExpr().toString();
+                } else if (left instanceof SQLExprTableSource) {
+                    SQLExprTableSource sqlExprTableSource = (SQLExprTableSource) left;
+                    tableName = sqlExprTableSource.getExpr().toString();
+                } else if (left instanceof SQLJoinTableSource){
+                    SQLJoinTableSource joinTableSource = (SQLJoinTableSource) left;
+                    if (joinTableSource.getLeft() instanceof  SQLExprTableSource) {
+                        SQLExprTableSource sqlExprTableSource = (SQLExprTableSource) joinTableSource.getLeft();
+                        tableName = sqlExprTableSource.getExpr().toString();
+                    }
+                }
+
+                SQLExpr newWhereCondition = this.createNewWhereCondition(tableName, where, alias);
                 sqlSelectQueryBlock.setWhere(newWhereCondition);
             } else if (table instanceof SQLSubqueryTableSource) {
                 // 例如 "select a,b from (select * from table_a) temp where temp.a = 'a';"
@@ -121,6 +139,10 @@ public class DefaultSqlParser implements SqlParser {
 
     @Override
     public void processInsert(SQLInsertStatement insert) {
+        String tableName = insert.getTableName().toString();
+        if (ignoreTable(tableName)) {
+            return;
+        }
         List<Object> tenantIds = this.tenantInfoHandler.getTenantIds();
         if (tenantIds == null || tenantIds.size() == 0) {
             return;
@@ -134,13 +156,18 @@ public class DefaultSqlParser implements SqlParser {
     public void processUpdate(SQLUpdateStatement update) {
         SQLTableSource sqlTableSource = update.getTableSource();
         String alias = sqlTableSource.getAlias();
+        String tableName = sqlTableSource.toString();
         if (sqlTableSource instanceof SQLJoinTableSource) {
             SQLJoinTableSource joinTable = (SQLJoinTableSource) sqlTableSource;
             SQLTableSource left = joinTable.getLeft();
             SQLTableSource right = joinTable.getRight();
             this.joinCondition(left);
             this.joinCondition(right);
-            SQLExpr tenantCondition = getTenantCondition(right.getAlias(), joinTable.getCondition());
+            if (right instanceof SQLExprTableSource) {
+                SQLExprTableSource sqlExprTableSource = (SQLExprTableSource) right;
+                tableName = sqlExprTableSource.getExpr().toString();
+            }
+            SQLExpr tenantCondition = getTenantCondition(tableName, right.getAlias(), joinTable.getCondition());
             if (tenantCondition != null) {
                 joinTable.addCondition(tenantCondition);
             }
@@ -153,8 +180,14 @@ public class DefaultSqlParser implements SqlParser {
             } else {
                 alias = left.getAlias();
             }
+            if (left instanceof SQLExprTableSource) {
+                tableName = ((SQLExprTableSource) left).getExpr().toString();
+            }
+        } else if (sqlTableSource instanceof SQLExprTableSource) {
+            tableName = ((SQLExprTableSource) sqlTableSource).getExpr().toString();
         }
-        SQLExpr tenantCondition = getTenantCondition(alias, update.getWhere());
+
+        SQLExpr tenantCondition = getTenantCondition(tableName, alias, update.getWhere());
         if (tenantCondition != null) {
             update.addCondition(tenantCondition);
         }
@@ -168,13 +201,18 @@ public class DefaultSqlParser implements SqlParser {
     public void processDelete(SQLDeleteStatement delete) {
         SQLTableSource tableSource = delete.getTableSource();
         String alias = tableSource.getAlias();
+        String tableName = null;
         if (tableSource instanceof SQLJoinTableSource) {
             SQLJoinTableSource joinTable = (SQLJoinTableSource) tableSource;
             SQLTableSource left = joinTable.getLeft();
             SQLTableSource right = joinTable.getRight();
             this.joinCondition(left);
             this.joinCondition(right);
-            SQLExpr tenantCondition = getTenantCondition(right.getAlias(), joinTable.getCondition());
+            if (right instanceof SQLExprTableSource) {
+                SQLExprTableSource sqlExprTableSource = (SQLExprTableSource) right;
+                tableName = sqlExprTableSource.getExpr().toString();
+            }
+            SQLExpr tenantCondition = getTenantCondition(tableName, right.getAlias(), joinTable.getCondition());
             if (tenantCondition != null) {
                 joinTable.addCondition(tenantCondition);
             }
@@ -187,9 +225,13 @@ public class DefaultSqlParser implements SqlParser {
             } else {
                 alias = left.getAlias();
             }
+
         }
 
-        SQLExpr tenantCondition = getTenantCondition(alias, delete.getWhere());
+        if (tableSource instanceof SQLExprTableSource) {
+            tableName = ((SQLExprTableSource) tableSource).getExpr().toString();
+        }
+        SQLExpr tenantCondition = getTenantCondition(tableName, alias, delete.getWhere());
         if (tenantCondition != null) {
             delete.addCondition(tenantCondition);
         }
@@ -207,14 +249,21 @@ public class DefaultSqlParser implements SqlParser {
     private void joinCondition(SQLTableSource sqlTableSource) {
         if (sqlTableSource instanceof SQLJoinTableSource) {
             SQLJoinTableSource sqlJoinTableSource = (SQLJoinTableSource) sqlTableSource;
-            SQLExpr tenantCondition = getTenantCondition(sqlJoinTableSource.getRight().getAlias(), sqlJoinTableSource.getCondition());
+            SQLTableSource left = sqlJoinTableSource.getLeft();
+            SQLTableSource right = sqlJoinTableSource.getRight();
+            String tableName = null;
+            if (right instanceof SQLExprTableSource) {
+                SQLExprTableSource sqlExprTableSource = (SQLExprTableSource) right;
+                tableName = sqlExprTableSource.getExpr().toString();
+            } else if (left instanceof SQLExprTableSource) {
+                SQLExprTableSource sqlExprTableSource = (SQLExprTableSource) left;
+                tableName = sqlExprTableSource.getExpr().toString();
+            }
+            SQLExpr tenantCondition = getTenantCondition(tableName, sqlJoinTableSource.getRight().getAlias(), sqlJoinTableSource.getCondition());
 
             if (tenantCondition != null) {
                 sqlJoinTableSource.addCondition(tenantCondition);
             }
-
-            SQLTableSource left = sqlJoinTableSource.getLeft();
-            SQLTableSource right = sqlJoinTableSource.getRight();
             joinCondition(left);
             joinCondition(right);
         } else if (sqlTableSource instanceof SQLSubqueryTableSource) {
@@ -225,10 +274,10 @@ public class DefaultSqlParser implements SqlParser {
         }
     }
 
-    private SQLExpr createNewWhereCondition(SQLExpr where, String alias) {
+    private SQLExpr createNewWhereCondition(String tableName, SQLExpr where, String alias) {
         // 如果是表达式
         if (where != null) {
-            SQLExpr tenantCondition = this.getTenantCondition(alias, where);
+            SQLExpr tenantCondition = this.getTenantCondition(tableName, alias, where);
             if (tenantCondition == null) {
                 return where;
             }
@@ -242,7 +291,7 @@ public class DefaultSqlParser implements SqlParser {
             // 返回新的条件
             return sqlBinaryOpExpr;
         } else {
-            return this.getTenantCondition(alias, where);
+            return this.getTenantCondition(tableName, alias, where);
         }
     }
 
@@ -255,7 +304,14 @@ public class DefaultSqlParser implements SqlParser {
         if (sqlExpr instanceof SQLInSubQueryExpr) {
             SQLSelectQueryBlock selectQueryBlock = ((SQLInSubQueryExpr) sqlExpr).getSubQuery().getQueryBlock();
             if (selectQueryBlock != null) {
-                SQLExpr tenantCondition = getTenantCondition(selectQueryBlock.getFrom().getAlias(), selectQueryBlock.getWhere());
+                SQLTableSource from = selectQueryBlock.getFrom();
+                String tableName = null;
+                if (from instanceof SQLExprTableSource) {
+                    tableName = ((SQLExprTableSource) selectQueryBlock.getFrom()).getExpr().toString();
+                } else {
+                    tableName = from.toString();
+                }
+                SQLExpr tenantCondition = getTenantCondition(tableName, selectQueryBlock.getFrom().getAlias(), selectQueryBlock.getWhere());
                 if (tenantCondition != null) {
                     selectQueryBlock.addCondition(tenantCondition);
                 }
@@ -273,8 +329,8 @@ public class DefaultSqlParser implements SqlParser {
      * @param alias 表别名
      * @return 返回条件
      */
-    private SQLExpr getTenantCondition(String alias, SQLExpr condition) {
-        if (isContainsTenantIdCondition(condition)) {
+    private SQLExpr getTenantCondition(String tableName, String alias, SQLExpr condition) {
+        if (isContainsTenantIdCondition(condition) || ignoreTable(tableName)) {
             return null;
         }
         List<Object> tenantIds = this.tenantInfoHandler.getTenantIds();
@@ -352,13 +408,14 @@ public class DefaultSqlParser implements SqlParser {
         if (tableName == null) {
             return false;
         }
-        List<String> ignoreTableNames = tenantInfoHandler.ignoreTablePrefix();
+        tableName = tableName.replace("`", "");
+        List<String> ignoreTableNames = tenantInfoHandler.ignoreTableName();
 
         if (ignoreTableNames == null || ignoreTableNames.size() == 0) {
             return false;
         }
         for (String ignoreTableName : ignoreTableNames) {
-            if (tableName.contains(ignoreTableName)) {
+            if (tableName.equals(ignoreTableName)) {
                 return true;
             }
         }

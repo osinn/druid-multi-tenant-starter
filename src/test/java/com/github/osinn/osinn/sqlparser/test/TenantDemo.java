@@ -1,5 +1,7 @@
 package com.github.osinn.osinn.sqlparser.test;
 
+import com.alibaba.druid.DbType;
+import com.alibaba.druid.util.JdbcConstants;
 import com.github.osinn.druid.multi.tenant.plugin.handler.TenantInfoHandler;
 import com.github.osinn.druid.multi.tenant.plugin.parser.DefaultSqlParser;
 
@@ -80,7 +82,12 @@ public class TenantDemo {
             }
 
             @Override
-            public List<String> ignoreTablePrefix() {
+            public DbType getDbType() {
+                return JdbcConstants.MYSQL;
+            }
+
+            @Override
+            public List<String> ignoreTableName() {
                 return new ArrayList<>();
             }
 

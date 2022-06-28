@@ -1,5 +1,7 @@
 package com.github.osinn.druid.multi.tenant.plugin.starter;
 
+import com.alibaba.druid.DbType;
+import com.alibaba.druid.util.JdbcConstants;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -25,18 +27,23 @@ public class TenantProperties {
     private String tenantIdColumn = "tenant_id";
 
     /**
-     * 是否忽略表按租户ID过滤,默认所有表都按租户ID过滤，指定表名称或表前缀
+     * 是否忽略表按租户ID过滤,默认所有表都按租户ID过滤，指定表名称
      */
-    private List<String> ignoreTablePrefix = new ArrayList<>();
+    private List<String> ignoreTableName = new ArrayList<>();
 
     /**
-     * 是否开启多租户配置,需要禁用druidFilterEnable
+     * 是否使用MyBatis拦截器方式修改sql,需要禁用druidFilterEnable
      */
-    private boolean mybatisEnable;
+    private boolean enable;
 
     /**
-     * 是否使用druid过滤器方式修改sql,需要禁用mybatisEnable
+     * 是否使用druid过滤器方式修改sql,需要禁用enable
      */
     private boolean druidFilterEnable;
+
+    /**
+     * 数据库方言
+     */
+    private DbType dbType = JdbcConstants.MYSQL;
 
 }

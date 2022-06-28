@@ -1,5 +1,6 @@
 package com.github.osinn.druid.multi.tenant.plugin.starter;
 
+import com.alibaba.druid.DbType;
 import com.github.osinn.druid.multi.tenant.plugin.MybatisMultiTenantPluginInterceptor;
 import com.github.osinn.druid.multi.tenant.plugin.handler.TenantInfoHandler;
 import com.github.osinn.druid.multi.tenant.plugin.service.ITenantService;
@@ -43,14 +44,20 @@ public class StartSysListener implements ApplicationListener<ContextRefreshedEve
                 }
 
                 @Override
-                public List<String> ignoreTablePrefix() {
-                    return tenantProperties.getIgnoreTablePrefix();
+                public List<String> ignoreTableName() {
+                    return tenantProperties.getIgnoreTableName();
                 }
 
                 @Override
                 public String getTenantIdColumn() {
                     return tenantProperties.getTenantIdColumn();
                 }
+
+                @Override
+                public DbType getDbType() {
+                    return tenantProperties.getDbType();
+                }
+
             }));
         }
     }
