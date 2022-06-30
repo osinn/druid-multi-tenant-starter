@@ -1,21 +1,23 @@
 # druid-multi-tenant-starter
 > 目标多租户插件，开箱即用，支持单个租户以及多个租户
 
+- demo地址：[https://github.com/osinn/druid-multi-tenant-demo](https://github.com/osinn/druid-multi-tenant-demo)
+
 # 支持
 - [x] Mybatis Plus
 - [x] Mybatis PageHelper 分页插件
 
 # 支持忽略tenantId策略
 - [x] 支持原SQL语句中已有tenantId字段条件跳过
-- [x] 支持原忽略指定表名添加tenantId字段条件
-- [x] 支持原忽略指定Mapper SQL语句
+- [x] 支持忽略指定表名添加tenantId字段条件
+- [x] 支持忽略指定Mapper接口SQL语句添加tenantId字段条件
 
 # 快速开始
-- 在已经集成`Mybatis`项目中引入以下依赖(未发布到中央仓库)
+- 在已经集成`Mybatis`项目中引入以下依赖
 
 ```
 <dependency>
-    <groupId>com.github.osinn</groupId>
+    <groupId>io.github.osinn</groupId>
     <artifactId>druid-multi-tenant-starter</artifactId>
     <version>1.0</version>
 </dependency>
@@ -36,7 +38,7 @@ mybatis:
         - user_role
       # 数据库中租户ID的列名
       tenant-id-column: tenant_id
-      # 是否使用druid过滤器方式修改sql,需要禁用enable
+      # 是否使用druid过滤器方式修改sql,依赖druid数据库连接池,需要禁用enable=false
       druid-filter-enable: false
 ```
 
