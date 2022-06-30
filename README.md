@@ -41,6 +41,39 @@ mybatis:
       # 是否使用druid过滤器方式修改sql,依赖druid数据库连接池,需要禁用enable=false
       druid-filter-enable: false
 ```
+# 实现提供获取多租户值接口
+- 需要实现ITenantService接口提供获取多租户ID值
+
+```
+/**
+ * 演示：提供多租户ID服务接口
+ *
+ * @author wency_cai
+ */
+@Service
+public class TenantServiceImpl implements ITenantService<Integer>{
+
+    @Override
+    public List<Integer> getTenantIds() {
+        // 查询系统多租户id,如果有多个返回多个值即可
+        int tenantId = 1;
+        return Lists.newArrayList(tenantId);
+    }
+}
+```
+- 到此整合完成
+
+# 多租户忽略Mapper方法
+```
+public interface UserMapper {
+
+    /**
+     * 添加@IgnoreTenantIdField注解来忽略设置多租户字段
+     */
+    @IgnoreTenantIdField
+    void deleteTestIgnoreTenantIdById(Long id);
+}
+```
 
 # select语句
 ```sql
