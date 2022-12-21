@@ -19,7 +19,7 @@
 <dependency>
     <groupId>io.github.osinn</groupId>
     <artifactId>druid-multi-tenant-starter</artifactId>
-    <version>1.2</version>
+    <version>1.3</version>
 </dependency>
 ```
 

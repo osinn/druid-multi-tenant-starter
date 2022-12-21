@@ -7,6 +7,7 @@ import com.alibaba.druid.sql.ast.statement.*;
 import com.github.osinn.druid.multi.tenant.plugin.handler.TenantInfoHandler;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -32,6 +33,9 @@ public class DefaultSqlParser implements SqlParser {
 
     @Override
     public String setTenantParameter(String sql) {
+        if (isEmpty(this.tenantInfoHandler.getTenantIds())) {
+            return sql;
+        }
         List<SQLStatement> statementList = SQLUtils.parseStatements(sql, tenantInfoHandler.getDbType());
         SQLStatement statement = statementList.get(0);
         if (statement instanceof SQLSelectStatement) {
@@ -157,6 +161,13 @@ public class DefaultSqlParser implements SqlParser {
 
     @Override
     public void processInsert(SQLInsertStatement insert) {
+        List<SQLExpr> columns = insert.getColumns();
+        for (SQLExpr column : columns) {
+            if (isContainsTenantIdCondition(column)) {
+                // 包含租户ID不再处理
+                return;
+            }
+        }
         String tableName = insert.getTableName().toString();
         if (ignoreTable(tableName)) {
             return;
@@ -403,7 +414,7 @@ public class DefaultSqlParser implements SqlParser {
      */
     private boolean isContainsTenantIdCondition(SQLExpr where) {
         if (!(where instanceof SQLBinaryOpExpr)) {
-            if (where instanceof SQLPropertyExpr) {
+            if (where instanceof SQLPropertyExpr || where instanceof SQLIdentifierExpr) {
                 return String.valueOf(where).contains(this.tenantInfoHandler.getTenantIdColumn());
             }
             return false;
@@ -479,4 +490,9 @@ public class DefaultSqlParser implements SqlParser {
     public void setTenantInfoHandler(TenantInfoHandler tenantInfoHandler) {
         this.tenantInfoHandler = tenantInfoHandler;
     }
+
+    public static boolean isEmpty(Collection<?> collection) {
+        return collection == null || collection.isEmpty();
+    }
+
 }
