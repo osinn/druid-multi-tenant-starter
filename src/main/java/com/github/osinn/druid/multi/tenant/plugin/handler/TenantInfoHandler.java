@@ -31,12 +31,18 @@ public interface TenantInfoHandler {
     <T> List<T> getTenantIds();
 
     /**
-     * 根据表名判断是否忽略拼接多租户ID条件
-     * 忽略 sys_ 开头的表
+     * 根据表名判断是否忽略拼接多租户ID条件(全等判断)
      *
-     * @return 返回 忽略的表名称或表前缀
+     * @return 返回 忽略的表名称
      */
     List<String> ignoreTableName();
+
+    /**
+     * 根据表名判断是否包含此字符串忽略拼接多租户ID条件(匹配判断)
+     *
+     * @return 返回 忽略的包含的表名称
+     */
+    List<String> ignoreMatchTableName();
 
     /**
      * 获取租户字段名

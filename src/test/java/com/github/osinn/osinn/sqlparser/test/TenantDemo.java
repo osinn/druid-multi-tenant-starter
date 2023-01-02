@@ -97,6 +97,11 @@ public class TenantDemo {
             }
 
             @Override
+            public List<String> ignoreMatchTableName() {
+                return new ArrayList<>();
+            }
+
+            @Override
             public String getTenantIdColumn() {
                 return "tenant_id";
             }

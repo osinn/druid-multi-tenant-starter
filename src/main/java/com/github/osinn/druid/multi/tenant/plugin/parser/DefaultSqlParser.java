@@ -445,18 +445,25 @@ public class DefaultSqlParser implements SqlParser {
         if (tableName == null) {
             return false;
         }
-        tableName = tableName.replace("`", "");
+        String ignoreTableName = tableName.replace("`", "");
         List<String> ignoreTableNames = tenantInfoHandler.ignoreTableName();
+        List<String> ignoreMatchTableNames = tenantInfoHandler.ignoreMatchTableName();
 
-        if (ignoreTableNames == null || ignoreTableNames.size() == 0) {
+        if (isEmpty(ignoreTableNames) && isEmpty(ignoreMatchTableNames)) {
             return false;
-        }
-        for (String ignoreTableName : ignoreTableNames) {
-            if (tableName.equals(ignoreTableName)) {
+        } else {
+            boolean ignore = false;
+            if (!isEmpty(ignoreTableNames)) {
+                ignore = ignoreTableNames.contains(ignoreTableName);
+            }
+            if (ignore) {
                 return true;
             }
+            if (!isEmpty(ignoreMatchTableNames)) {
+                ignore = ignoreMatchTableNames.stream().allMatch(str -> str.contains(ignoreTableName));
+            }
+            return ignore;
         }
-        return false;
     }
 
     /**

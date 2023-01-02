@@ -19,7 +19,7 @@
 <dependency>
     <groupId>io.github.osinn</groupId>
     <artifactId>druid-multi-tenant-starter</artifactId>
-    <version>1.3</version>
+    <version>1.4</version>
 </dependency>
 ```
 
@@ -32,15 +32,21 @@ mybatis:
       enable: true
       # 数据库方言
       db-type: mysql
-      # 是否忽略表按租户ID过滤,默认所有表都按租户ID过滤，指定表名称
+      # 是否忽略表按租户ID过滤,默认所有表都按租户ID过滤，指定表名称(区分大小写全等判断)
       ignore-table-name:
 #        - user
         - user_role
+      ignore-match-table-name
+      # 匹配判断指定表名称是否忽略表按租户ID过滤(区分大小写匹配判断)
+        - temp # tempTableName
       # 数据库中租户ID的列名
       tenant-id-column: tenant_id
       # 是否使用druid过滤器方式修改sql,依赖druid数据库连接池,需要禁用enable=false
       druid-filter-enable: false
 ```
+- 如果SQL中表名不在 ignore-table-name 中，则去ignore-match-table-name匹配查找
+- 执行SQL中存在临时表可以约束指定 ignore-match-table-name 匹配临时表名称来忽略临时表添加租户ID查询条件
+
 # 实现提供获取多租户值接口
 - 需要实现ITenantService接口提供获取多租户ID值
 

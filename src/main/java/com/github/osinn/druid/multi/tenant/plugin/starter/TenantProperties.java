@@ -27,9 +27,14 @@ public class TenantProperties {
     private String tenantIdColumn = "tenant_id";
 
     /**
-     * 是否忽略表按租户ID过滤,默认所有表都按租户ID过滤，指定表名称
+     * 是否忽略表按租户ID过滤,默认所有表都按租户ID过滤，指定表名称(区分大小写全等判断)
      */
     private List<String> ignoreTableName = new ArrayList<>();
+
+    /**
+     * 匹配判断指定表名称是否忽略表按租户ID过滤(区分大小写匹配判断)
+     */
+    private List<String> ignoreMatchTableName = new ArrayList<>();
 
     /**
      * 是否使用MyBatis拦截器方式修改sql,需要禁用druidFilterEnable
