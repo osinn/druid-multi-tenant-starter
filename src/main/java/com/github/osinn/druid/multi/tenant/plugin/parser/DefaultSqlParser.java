@@ -460,7 +460,7 @@ public class DefaultSqlParser implements SqlParser {
                 return true;
             }
             if (!isEmpty(ignoreMatchTableNames)) {
-                ignore = ignoreMatchTableNames.stream().allMatch(str -> str.contains(ignoreTableName));
+                ignore = ignoreMatchTableNames.stream().allMatch(ignoreTableName::contains);
             }
             return ignore;
         }
