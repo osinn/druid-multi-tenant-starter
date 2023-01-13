@@ -38,11 +38,11 @@ public interface TenantInfoHandler {
     List<String> ignoreTableName();
 
     /**
-     * 根据表名判断是否包含此字符串忽略拼接多租户ID条件(匹配判断)
+     * 根据表别名判断是否包含此字符串忽略拼接多租户ID条件(匹配判断)
      *
-     * @return 返回 忽略的包含的表名称
+     * @return 返回 忽略的包含的表别名
      */
-    List<String> ignoreMatchTableName();
+    List<String> ignoreMatchTableAlias();
 
     /**
      * 获取租户字段名

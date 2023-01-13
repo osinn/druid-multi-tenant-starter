@@ -49,8 +49,8 @@ public class StartSysListener implements ApplicationListener<ContextRefreshedEve
                 }
 
                 @Override
-                public List<String> ignoreMatchTableName() {
-                    return tenantProperties.getIgnoreMatchTableName();
+                public List<String> ignoreMatchTableAlias() {
+                    return tenantProperties.getIgnoreMatchTableAlias();
                 }
 
                 @Override

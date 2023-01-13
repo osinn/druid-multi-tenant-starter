@@ -356,7 +356,7 @@ public class DefaultSqlParser implements SqlParser {
      * @return 返回条件
      */
     private SQLExpr getTenantCondition(String tableName, String alias, SQLExpr condition) {
-        if (isContainsTenantIdCondition(condition) || ignoreTable(tableName)) {
+        if (isContainsTenantIdCondition(condition) || ignoreTable(tableName) || ignoreTableAlias(alias)) {
             return null;
         }
         List<Object> tenantIds = this.tenantInfoHandler.getTenantIds();
@@ -441,28 +441,47 @@ public class DefaultSqlParser implements SqlParser {
         return isContainsTenantIdCondition;
     }
 
+    /**
+     * 根据表名判断是否需要忽略
+     *
+     * @param tableName 表名
+     * @return
+     */
     private boolean ignoreTable(String tableName) {
         if (tableName == null) {
             return false;
         }
-        String ignoreTableName = tableName.replace("`", "");
+        tableName = tableName.replace("`", "");
         List<String> ignoreTableNames = tenantInfoHandler.ignoreTableName();
-        List<String> ignoreMatchTableNames = tenantInfoHandler.ignoreMatchTableName();
 
-        if (isEmpty(ignoreTableNames) && isEmpty(ignoreMatchTableNames)) {
+        if (ignoreTableNames == null || ignoreTableNames.size() == 0) {
             return false;
-        } else {
-            boolean ignore = false;
-            if (!isEmpty(ignoreTableNames)) {
-                ignore = ignoreTableNames.contains(ignoreTableName);
-            }
-            if (ignore) {
+        }
+        for (String ignoreTableName : ignoreTableNames) {
+            if (tableName.equals(ignoreTableName)) {
                 return true;
             }
-            if (!isEmpty(ignoreMatchTableNames)) {
-                ignore = ignoreMatchTableNames.stream().allMatch(ignoreTableName::contains);
-            }
-            return ignore;
+        }
+        return false;
+    }
+
+    /**
+     * 根据表别名判断是否需要忽略
+     *
+     * @param tableAlias 表别名
+     * @return
+     */
+    private boolean ignoreTableAlias(String tableAlias) {
+        if (tableAlias == null) {
+            return false;
+        }
+
+        List<String> ignoreMatchTableAlias = tenantInfoHandler.ignoreMatchTableAlias();
+
+        if (isEmpty(ignoreMatchTableAlias)) {
+            return false;
+        } else {
+            return ignoreMatchTableAlias.stream().allMatch(tableAlias::contains);
         }
     }
 

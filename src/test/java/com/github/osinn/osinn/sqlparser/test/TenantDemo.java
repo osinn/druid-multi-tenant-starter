@@ -73,6 +73,14 @@ public class TenantDemo {
             "SELECT vehicle_id AS vid,MAX(created_time) AS time1 FROM tbl_vehicle_maintenance WHERE deleted=0 GROUP BY vehicle_id) vl1 ON vl.vehicle_id=vl1.vid AND vl.created_time=vl1.time1 WHERE vl1.vid IN ('11122','3333') GROUP BY vl.vehicle_id,vl.created_time)";
 
 
+    private static final String sql38 = "SELECT t2.*FROM (\n" +
+            "SELECT @r AS _id,(\n" +
+            "SELECT @r :=parent_id FROM tbl_dept WHERE id=_id) AS parent_id,@s :=@s+1 AS sort FROM (\n" +
+            "SELECT @r :=32,@s :=0) temp,tbl_dept WHERE @r> 0) temp1 JOIN tbl_dept t2 ON temp1._id=t2.id AND t2.cp_delete=0 ORDER BY temp1.sort DESC";
+
+    private static final String sql39 = "SELECT id, name,tenant_id FROM role temp";
+
+
     public static void main(String[] args) {
         DefaultSqlParser defaultSqlParser = new DefaultSqlParser();
         defaultSqlParser.setTenantInfoHandler(new TenantInfoHandler() {
@@ -97,8 +105,10 @@ public class TenantDemo {
             }
 
             @Override
-            public List<String> ignoreMatchTableName() {
-                return new ArrayList<>();
+            public List<String> ignoreMatchTableAlias() {
+                List<String> objects = new ArrayList<>();
+                objects.add("temp");
+                return objects;
             }
 
             @Override
@@ -180,6 +190,10 @@ public class TenantDemo {
         System.out.println(defaultSqlParser.setTenantParameter(sql36));
         System.out.println("------------------------------------- \n");
         System.out.println(defaultSqlParser.setTenantParameter(sql37));
+        System.out.println("------------------------------------- \n");
+        System.out.println(defaultSqlParser.setTenantParameter(sql38));
+        System.out.println("------------------------------------- \n");
+        System.out.println(defaultSqlParser.setTenantParameter(sql39));
 
     }
 }

@@ -32,9 +32,9 @@ public class TenantProperties {
     private List<String> ignoreTableName = new ArrayList<>();
 
     /**
-     * 匹配判断指定表名称是否忽略表按租户ID过滤(区分大小写匹配判断)
+     * 匹配判断指定表别名是否忽略表按租户ID过滤(区分大小写匹配判断)
      */
-    private List<String> ignoreMatchTableName = new ArrayList<>();
+    private List<String> ignoreMatchTableAlias = new ArrayList<>();
 
     /**
      * 是否使用MyBatis拦截器方式修改sql,需要禁用druidFilterEnable
