@@ -11,6 +11,8 @@
 - [x] 支持原SQL语句中已有tenantId字段条件跳过
 - [x] 支持忽略指定表名添加tenantId字段条件
 - [x] 支持忽略指定Mapper接口SQL语句添加tenantId字段条件
+- [x] 支持指定`表名`忽略SQL语句添加tenantId字段条件
+- [x] 支持指定`别名`忽略SQL语句添加tenantId字段条件
 
 # 快速开始
 - 在已经集成`Mybatis`项目中引入以下依赖
@@ -44,8 +46,8 @@ mybatis:
       # 是否使用druid过滤器方式修改sql,依赖druid数据库连接池,需要禁用enable=false
       druid-filter-enable: false
 ```
-- 如果SQL中表名不在 ignore-table-name 中，则去ignore-match-table-name匹配查找
-- 执行SQL中存在临时表可以约束指定 ignore-match-table-name 匹配临时表名称来忽略临时表添加租户ID查询条件
+- 如果SQL中表名不在 `ignore-table-name` 中，则去`ignore-match-table-alias`匹配查找
+- 执行SQL中存在临时表可以约束指定 `ignore-match-table-alias` 匹配临时表别名来忽略临时表添加租户ID查询条件
 
 # 实现提供获取多租户值接口
 - 需要实现ITenantService接口提供获取多租户ID值
