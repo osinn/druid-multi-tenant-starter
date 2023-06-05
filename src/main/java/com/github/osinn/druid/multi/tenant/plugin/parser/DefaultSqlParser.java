@@ -41,14 +41,11 @@ public class DefaultSqlParser implements SqlParser {
         if (statement instanceof SQLSelectStatement) {
             SQLSelectStatement sqlSelectStatement = (SQLSelectStatement) statement;
             processSelectBody(sqlSelectStatement.getSelect().getQuery());
-        }
-        if (statement instanceof SQLInsertStatement) {
+        } else if (statement instanceof SQLInsertStatement) {
             processInsert((SQLInsertStatement) statement);
-        }
-        if (statement instanceof SQLUpdateStatement) {
+        } else if (statement instanceof SQLUpdateStatement) {
             processUpdate((SQLUpdateStatement) statement);
-        }
-        if (statement instanceof SQLDeleteStatement) {
+        } else if (statement instanceof SQLDeleteStatement) {
             processDelete((SQLDeleteStatement) statement);
         }
         return statement.toString();
@@ -500,6 +497,9 @@ public class DefaultSqlParser implements SqlParser {
             } else if (sqlJoinTableSource.getLeft() instanceof SQLExprTableSource) {
                 SQLExprTableSource sqlExprTableSource = (SQLExprTableSource) sqlJoinTableSource.getLeft();
                 return sqlExprTableSource.getAlias();
+            } else if (sqlJoinTableSource.getLeft() instanceof SQLSubqueryTableSource) {
+                SQLSubqueryTableSource sqlSubqueryTableSource = (SQLSubqueryTableSource) sqlJoinTableSource.getLeft();
+                return sqlSubqueryTableSource.getAlias();
             } else {
                 return sqlJoinTableSource.getAlias();
             }

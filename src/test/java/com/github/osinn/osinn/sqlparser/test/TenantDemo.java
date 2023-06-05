@@ -80,6 +80,12 @@ public class TenantDemo {
 
     private static final String sql39 = "SELECT id, name,tenant_id FROM role temp";
 
+    private static final String sql40 = "SELECT *\n" +
+            "        from\n" +
+            "                (SELECT * from test_t1) a \n" +
+            "                LEFT JOIN test_t2 pd ON a.depository_id = pd.id\n" +
+            "                LEFT JOIN test_t3 pi ON a.order_no = pi.order_no\n" +
+            "        ORDER BY a.part_no";
 
     public static void main(String[] args) {
         DefaultSqlParser defaultSqlParser = new DefaultSqlParser();
@@ -90,7 +96,7 @@ public class TenantDemo {
                 Long tenantId2 = 1540616731523944448L;
                 List<Long> tenantIdList = new ArrayList<>();
                 tenantIdList.add(tenantId);
-                tenantIdList.add(tenantId2);
+//                tenantIdList.add(tenantId2);
                 return tenantIdList;
             }
 
@@ -194,6 +200,7 @@ public class TenantDemo {
         System.out.println(defaultSqlParser.setTenantParameter(sql38));
         System.out.println("------------------------------------- \n");
         System.out.println(defaultSqlParser.setTenantParameter(sql39));
+        System.out.println(defaultSqlParser.setTenantParameter(sql40));
 
     }
 }
