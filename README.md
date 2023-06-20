@@ -1,5 +1,7 @@
 # druid-multi-tenant-starter
-> 目标多租户插件，开箱即用，支持单个租户以及多个租户
+> 目标多租户插件，快速集成，开箱即用，支持单个租户以及多个租户，基于alibaba druid 解析SQL，开发过程中只需要像平时一样写SQL语句即可，执行SQL最终会被拦截串改，最终把租户字段添加到SQL语句中，生成新的SQL语句，此过程你无需关心是如何添加。
+
+**需要注意的是，插件最终会认为每个表都会存在租户ID字段，所以，每个表都应该出现租户ID字段，否则需要在配置中明确指出需要忽略的表，忽略的表将不会拼接租户ID字段查询条件，临时表亦是如此(否则临时表结果集中需要出现租户ID字段)**
 
 - demo地址：[https://github.com/osinn/druid-multi-tenant-demo](https://github.com/osinn/druid-multi-tenant-demo)
 
