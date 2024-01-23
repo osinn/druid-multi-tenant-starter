@@ -12,20 +12,12 @@ import java.util.List;
 
 /**
  * sql解析器实现
- * 核心类	            举例	                            说明	        适用范围	                快速记忆
- * SQLIdentifierExpr	id,name,age	SQLIdentifierExpr	查询字段或者where条件	                唯一标记
- * SQLPropertyExpr	    u.id,u.name	                    区别于SQLIdentifierExpr,适用于有别名的场景; SQLPropertyExpr.name = id, SQLPropertyExpr.owner = SQLIdentifierExpr = u）
- * 查询字段或者where条件	    有别名就是它
- * SQLBinaryOpExpr	    id = 1, id > 5	SQLBinaryOpExpr(left = SQLIdentifierExpr = id ,right = SQLValuableExpr = 1)
- * where条件	            有操作符就是它
- * SQLVariantRefExpr	id = ?	                        变量         where条件	            有变量符就是它
- * SQLIntegerExpr	    id = 1	                        数字类型	    值类型	                    -
- * SQLCharExpr	        name = '孙悟空'	                字符类型	    值类型	                    -
  *
  * @author wency_cai
  */
 @Slf4j
 public class DefaultSqlParser implements SqlParser {
+
     /**
      * 处理多租户信息处理器
      */
@@ -451,11 +443,38 @@ public class DefaultSqlParser implements SqlParser {
         tableName = tableName.replace("`", "");
         List<String> ignoreTableNames = tenantInfoHandler.ignoreTableName();
 
-        if (ignoreTableNames == null || ignoreTableNames.size() == 0) {
+        boolean ignoreTable = ignoreTableNamePrefix(tableName);
+        if (ignoreTable) {
+            return ignoreTable;
+        }
+
+        if (isEmpty(ignoreTableNames)) {
             return false;
         }
+
         for (String ignoreTableName : ignoreTableNames) {
             if (tableName.equals(ignoreTableName)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 根据表名前缀判断是否需要忽略
+     *
+     * @param tableName 表名
+     * @return
+     */
+    private boolean ignoreTableNamePrefix(String tableName) {
+
+        List<String> ignoreTableNamePrefix = tenantInfoHandler.ignoreTableNamePrefix();
+
+        if (isEmpty(ignoreTableNamePrefix)) {
+            return false;
+        }
+        for (String tableNamePrefix : ignoreTableNamePrefix) {
+            if (tableName.indexOf(tableNamePrefix) == 0) {
                 return true;
             }
         }

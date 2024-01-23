@@ -87,6 +87,13 @@ public class TenantDemo {
             "                LEFT JOIN test_t3 pi ON a.order_no = pi.order_no\n" +
             "        ORDER BY a.part_no";
 
+    private static final String sql41 = "SELECT *\n" +
+            "        from\n" +
+            "                (SELECT * from act_test_t1) a \n" +
+            "                LEFT JOIN test_t2 pd ON a.depository_id = pd.id\n" +
+            "                LEFT JOIN test_t3 pi ON a.order_no = pi.order_no\n" +
+            "        ORDER BY a.part_no";
+
     public static void main(String[] args) {
         DefaultSqlParser defaultSqlParser = new DefaultSqlParser();
         defaultSqlParser.setTenantInfoHandler(new TenantInfoHandler() {
@@ -114,6 +121,13 @@ public class TenantDemo {
             public List<String> ignoreMatchTableAlias() {
                 List<String> objects = new ArrayList<>();
                 objects.add("temp");
+                return objects;
+            }
+
+            @Override
+            public List<String> ignoreTableNamePrefix() {
+                List<String> objects = new ArrayList<>();
+                objects.add("act_");
                 return objects;
             }
 
@@ -200,7 +214,10 @@ public class TenantDemo {
         System.out.println(defaultSqlParser.setTenantParameter(sql38));
         System.out.println("------------------------------------- \n");
         System.out.println(defaultSqlParser.setTenantParameter(sql39));
+        System.out.println("------------------------------------- \n");
         System.out.println(defaultSqlParser.setTenantParameter(sql40));
+        System.out.println("------------------------------------- \n");
+        System.out.println(defaultSqlParser.setTenantParameter(sql41));
 
     }
 }

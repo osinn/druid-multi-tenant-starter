@@ -37,6 +37,11 @@ public class TenantProperties {
     private List<String> ignoreMatchTableAlias = new ArrayList<>();
 
     /**
+     * 忽略表名前缀
+     */
+    private List<String> ignoreTableNamePrefix = new ArrayList<>();
+
+    /**
      * 是否使用MyBatis拦截器方式修改sql,需要禁用druidFilterEnable
      */
     private boolean enable;

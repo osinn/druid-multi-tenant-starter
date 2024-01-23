@@ -21,7 +21,7 @@
 <dependency>
     <groupId>io.github.osinn</groupId>
     <artifactId>druid-multi-tenant-starter</artifactId>
-    <version>1.4.2</version>
+    <version>1.4.3</version>
 </dependency>
 ```
 
@@ -41,6 +41,9 @@ mybatis:
       ignore-match-table-alias
       # 匹配判断指定表别名称是否忽略表按租户ID过滤(区分大小写匹配判断)
         - temp # tempTableAlias
+      # 根据表名前缀判断是否忽略表按租户ID过滤
+      ignore-table-name-prefix: 
+        - act_
       # 数据库中租户ID的列名
       tenant-id-column: tenant_id
       # 是否使用druid过滤器方式修改sql,依赖druid数据库连接池,需要禁用enable=false

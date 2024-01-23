@@ -45,6 +45,13 @@ public interface TenantInfoHandler {
     List<String> ignoreMatchTableAlias();
 
     /**
+     * 根据表名前缀判断是否忽略拼接多租户ID条件
+     *
+     * @return 返回 忽略的表名称前缀
+     */
+    List<String> ignoreTableNamePrefix();
+
+    /**
      * 获取租户字段名
      * <p>
      * 默认字段名叫: tenant_id
