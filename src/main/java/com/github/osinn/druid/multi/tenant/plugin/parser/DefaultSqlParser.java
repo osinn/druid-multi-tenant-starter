@@ -220,8 +220,13 @@ public class DefaultSqlParser implements SqlParser {
         SQLTableSource tableSource = delete.getTableSource();
         String alias = tableSource.getAlias();
         String tableName = null;
-        if (tableSource instanceof SQLJoinTableSource) {
-            SQLJoinTableSource joinTable = (SQLJoinTableSource) tableSource;
+        if (tableSource instanceof SQLJoinTableSource || delete.getFrom() instanceof SQLJoinTableSource) {
+            SQLJoinTableSource joinTable;
+            if(tableSource instanceof SQLJoinTableSource) {
+                joinTable = (SQLJoinTableSource) tableSource;
+            } else {
+                joinTable = (SQLJoinTableSource) delete.getFrom();
+            }
             SQLTableSource left = joinTable.getLeft();
             SQLTableSource right = joinTable.getRight();
             this.joinCondition(left);
@@ -244,10 +249,9 @@ public class DefaultSqlParser implements SqlParser {
                 alias = left.getAlias();
             }
 
-        }
-
-        if (tableSource instanceof SQLExprTableSource) {
-            tableName = ((SQLExprTableSource) tableSource).getExpr().toString();
+        } else if (tableSource instanceof SQLExprTableSource) {
+            SQLExprTableSource sqlExprTableSource = (SQLExprTableSource) tableSource;
+            tableName = sqlExprTableSource.getExpr().toString();
         }
         SQLExpr tenantCondition = getTenantCondition(tableName, alias, delete.getWhere());
         if (tenantCondition != null) {

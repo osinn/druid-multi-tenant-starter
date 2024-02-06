@@ -45,7 +45,7 @@ public class TenantDemo {
     private static final String sql24 = "SELECT id, name,tenant_id FROM role where tenant_id=1";
 
 
-    private static final String sql25 = "delete from user where id = 1";
+    private static final String sql25 = "delete from user u where u.id = 1";
     private static final String sql26 = "delete from user where id in ( select id from user s )";
     private static final String sql27 = "DELETE FROM system_permission_data sp LEFT JOIN system_role_data_relation re ON sp.id=re.data_id LEFT JOIN system_role sr ON sr.id=re.role_id WHERE sr.id=1";
 
@@ -94,6 +94,13 @@ public class TenantDemo {
             "                LEFT JOIN test_t3 pi ON a.order_no = pi.order_no\n" +
             "        ORDER BY a.part_no";
 
+    private static final String sql42 = "DELETE a \n" +
+            "FROM\n" +
+            "\tact_test_t1 a\n" +
+            "\tJOIN act_test_t2 b ON a.message_id = b.message_id \n" +
+            "WHERE\n" +
+            "\tb.test_id = '92fa9ed3-b0f8-11ee-9df6-f21898798332'";
+
     public static void main(String[] args) {
         DefaultSqlParser defaultSqlParser = new DefaultSqlParser();
         defaultSqlParser.setTenantInfoHandler(new TenantInfoHandler() {
@@ -127,7 +134,7 @@ public class TenantDemo {
             @Override
             public List<String> ignoreTableNamePrefix() {
                 List<String> objects = new ArrayList<>();
-                objects.add("act_");
+//                objects.add("act_");
                 return objects;
             }
 
@@ -218,6 +225,8 @@ public class TenantDemo {
         System.out.println(defaultSqlParser.setTenantParameter(sql40));
         System.out.println("------------------------------------- \n");
         System.out.println(defaultSqlParser.setTenantParameter(sql41));
+        System.out.println("------------------------------------- \n");
+        System.out.println(defaultSqlParser.setTenantParameter(sql42));
 
     }
 }
