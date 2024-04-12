@@ -2,6 +2,7 @@ package com.github.osinn.druid.multi.tenant.plugin;
 
 import com.github.osinn.druid.multi.tenant.plugin.handler.TenantInfoHandler;
 import com.github.osinn.druid.multi.tenant.plugin.parser.DefaultSqlParser;
+import com.github.osinn.druid.multi.tenant.plugin.service.ITenantService;
 import org.apache.ibatis.cache.CacheKey;
 import org.apache.ibatis.executor.Executor;
 import org.apache.ibatis.executor.statement.StatementHandler;
@@ -31,13 +32,18 @@ public class MybatisMultiTenantPluginInterceptor implements Interceptor {
     private static final DefaultSqlParser DEFAULT_SQL_PARSER = new DefaultSqlParser();
 
 
-
-    public MybatisMultiTenantPluginInterceptor(TenantInfoHandler tenantInfoHandler) {
+    public MybatisMultiTenantPluginInterceptor(ITenantService tenantService, TenantInfoHandler tenantInfoHandler) {
         DEFAULT_SQL_PARSER.setTenantInfoHandler(tenantInfoHandler);
+        DEFAULT_SQL_PARSER.setTenantService(tenantService);
     }
 
     @Override
     public Object intercept(Invocation invocation) throws Throwable {
+
+        if(DEFAULT_SQL_PARSER.isIgnoreDynamicDatasource()) {
+            return invocation.proceed();
+        }
+
         Object target = invocation.getTarget();
         if (target instanceof Executor) {
             MappedStatement ms = (MappedStatement) invocation.getArgs()[0];

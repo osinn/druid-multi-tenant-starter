@@ -5,6 +5,7 @@ import com.alibaba.druid.sql.ast.*;
 import com.alibaba.druid.sql.ast.expr.*;
 import com.alibaba.druid.sql.ast.statement.*;
 import com.github.osinn.druid.multi.tenant.plugin.handler.TenantInfoHandler;
+import com.github.osinn.druid.multi.tenant.plugin.service.ITenantService;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Collection;
@@ -22,6 +23,11 @@ public class DefaultSqlParser implements SqlParser {
      * 处理多租户信息处理器
      */
     private TenantInfoHandler tenantInfoHandler;
+
+    /**
+     * 多租户服务接口
+     */
+    private ITenantService tenantService;
 
     @Override
     public String setTenantParameter(String sql) {
@@ -139,12 +145,17 @@ public class DefaultSqlParser implements SqlParser {
                 SQLSubqueryTableSource subQueryTable = (SQLSubqueryTableSource) table;
                 SQLSelectQuery query = subQueryTable.getSelect().getQuery();
                 processSelectBody(query);
+            } else if (table instanceof SQLUnionQueryTableSource) {
+                SQLUnionQueryTableSource sqlUnionQueryTableSource = (SQLUnionQueryTableSource) table;
+                // 处理union的查询语句
+                SQLUnionQuery sqlUnionQuery = sqlUnionQueryTableSource.getUnion();
+                unionQuery(sqlUnionQuery);
             }
 
         } else if (sqlSelectQuery instanceof SQLUnionQuery) {
             // 处理union的查询语句
             SQLUnionQuery sqlUnionQuery = (SQLUnionQuery) sqlSelectQuery;
-            sqlUnionQuery.getRelations().forEach(this::processSelectBody);
+            unionQuery(sqlUnionQuery);
         }
     }
 
@@ -222,7 +233,7 @@ public class DefaultSqlParser implements SqlParser {
         String tableName = null;
         if (tableSource instanceof SQLJoinTableSource || delete.getFrom() instanceof SQLJoinTableSource) {
             SQLJoinTableSource joinTable;
-            if(tableSource instanceof SQLJoinTableSource) {
+            if (tableSource instanceof SQLJoinTableSource) {
                 joinTable = (SQLJoinTableSource) tableSource;
             } else {
                 joinTable = (SQLJoinTableSource) delete.getFrom();
@@ -293,6 +304,11 @@ public class DefaultSqlParser implements SqlParser {
             SQLSubqueryTableSource subQueryTable = (SQLSubqueryTableSource) sqlTableSource;
             SQLSelectQuery query = subQueryTable.getSelect().getQuery();
             processSelectBody(query);
+        } else if (sqlTableSource instanceof SQLUnionQueryTableSource) {
+            SQLUnionQueryTableSource sqlUnionQueryTableSource = (SQLUnionQueryTableSource) sqlTableSource;
+            // 处理union的查询语句
+            SQLUnionQuery sqlUnionQuery = sqlUnionQueryTableSource.getUnion();
+            unionQuery(sqlUnionQuery);
         }
     }
 
@@ -331,9 +347,17 @@ public class DefaultSqlParser implements SqlParser {
      */
     private void whereIn(SQLExpr sqlExpr) {
         if (sqlExpr instanceof SQLInSubQueryExpr) {
-            SQLSelectQueryBlock selectQueryBlock = ((SQLInSubQueryExpr) sqlExpr).getSubQuery().getQueryBlock();
+            SQLSelect subQuery = ((SQLInSubQueryExpr) sqlExpr).getSubQuery();
+            SQLSelectQueryBlock selectQueryBlock = subQuery.getQueryBlock();
             if (selectQueryBlock != null) {
                 processSelectBody(selectQueryBlock);
+            } else {
+                SQLSelectQuery query = subQuery.getQuery();
+                if (query instanceof SQLUnionQuery) {
+                    // 处理union的查询语句
+                    SQLUnionQuery sqlUnionQuery = (SQLUnionQuery) query;
+                    unionQuery(sqlUnionQuery);
+                }
             }
         } else if (sqlExpr instanceof SQLBinaryOpExpr) {
             SQLBinaryOpExpr sqlBinaryOpExpr = (SQLBinaryOpExpr) sqlExpr;
@@ -432,6 +456,15 @@ public class DefaultSqlParser implements SqlParser {
             isContainsTenantIdCondition = String.valueOf(right).equals(this.tenantInfoHandler.getTenantIdColumn());
         }
         return isContainsTenantIdCondition;
+    }
+
+    /**
+     * union 查询
+     *
+     * @param sqlUnionQuery
+     */
+    private void unionQuery(SQLUnionQuery sqlUnionQuery) {
+        sqlUnionQuery.getRelations().forEach(this::processSelectBody);
     }
 
     /**
@@ -540,8 +573,25 @@ public class DefaultSqlParser implements SqlParser {
         this.tenantInfoHandler = tenantInfoHandler;
     }
 
+    public void setTenantService(ITenantService tenantService) {
+        this.tenantService = tenantService;
+    }
+
     public static boolean isEmpty(Collection<?> collection) {
         return collection == null || collection.isEmpty();
     }
 
+    /**
+     * 判断数据源是否直接跳过租户ID设置
+     *
+     * @return
+     */
+    public boolean isIgnoreDynamicDatasource() {
+        String ignoreDynamicDatasource = tenantService.ignoreDynamicDatasource();
+        List<String> ignoreDynamicDatasourceList = tenantInfoHandler.ignoreDynamicDatasource();
+        if (ignoreDynamicDatasource == null || ignoreDynamicDatasource.length() == 0 || isEmpty(ignoreDynamicDatasourceList)) {
+            return false;
+        }
+        return ignoreDynamicDatasourceList.contains(ignoreDynamicDatasource);
+    }
 }

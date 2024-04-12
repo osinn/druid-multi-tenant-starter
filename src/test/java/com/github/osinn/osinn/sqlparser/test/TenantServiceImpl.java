@@ -19,4 +19,9 @@ public class TenantServiceImpl implements ITenantService<Long> {
         tenantIdList.add(tenantId);
         return tenantIdList;
     }
+
+    @Override
+    public String ignoreDynamicDatasource() {
+        return "demoSource";
+    }
 }

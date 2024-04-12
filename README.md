@@ -4,6 +4,7 @@
 **需要注意的是，插件最终会认为每个表都会存在租户ID字段，所以，每个表都应该出现租户ID字段，否则需要在配置中明确指出需要忽略的表，忽略的表将不会拼接租户ID字段查询条件，临时表亦是如此(否则临时表结果集中需要出现租户ID字段)**
 
 - demo地址：[https://github.com/osinn/druid-multi-tenant-demo](https://github.com/osinn/druid-multi-tenant-demo)
+- jdk1.8+
 
 # 支持
 - [x] Mybatis Plus
@@ -23,7 +24,7 @@
 <dependency>
     <groupId>io.github.osinn</groupId>
     <artifactId>druid-multi-tenant-starter</artifactId>
-    <version>1.4.4</version>
+    <version>1.4.6</version>
 </dependency>
 ```
 
@@ -46,6 +47,9 @@ mybatis:
       # 根据表名前缀判断是否忽略表按租户ID过滤
       ignore-table-name-prefix: 
         - act_
+      # 多数据源情况下指定忽略跳过的数据源名称（需要重写ITenantService接口中的ignoreDynamicDatasource方法自行提供获取当前执行的数据源名称）
+      ignore-dynamic-datasource:
+        - demoDataSource
       # 数据库中租户ID的列名
       tenant-id-column: tenant_id
       # 是否使用druid过滤器方式修改sql,依赖druid数据库连接池,需要禁用enable=false
@@ -71,6 +75,13 @@ public class TenantServiceImpl implements ITenantService<Integer>{
         // 查询系统多租户id,如果有多个返回多个值即可
         int tenantId = 1;
         return Lists.newArrayList(tenantId);
+    }
+    
+    // 如果需要指定某个数据源跳过设置租户ID，可以重写此方法，并且在yml配置文件中配置 ignore-dynamic-datasource 指定忽略的数据源名称
+    @Override
+    public String ignoreDynamicDatasource() {
+        // 过去当前执行的数据源名称, 空则需要执行解析设置租户ID
+        return 返回当前执行的数据源名称;
     }
 }
 ```

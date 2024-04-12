@@ -4,6 +4,7 @@ import com.alibaba.druid.DbType;
 import com.alibaba.druid.util.JdbcConstants;
 import com.github.osinn.druid.multi.tenant.plugin.handler.TenantInfoHandler;
 import com.github.osinn.druid.multi.tenant.plugin.parser.DefaultSqlParser;
+import com.github.osinn.druid.multi.tenant.plugin.service.ITenantService;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -101,8 +102,27 @@ public class TenantDemo {
             "WHERE\n" +
             "\tb.test_id = '92fa9ed3-b0f8-11ee-9df6-f21898798332'";
 
+    private static String sql43 = "SELECT t.* FROM (\n" +
+            "\tSELECT u.username FROM `user`  u\n" +
+            "\tunion \n" +
+            "\tSELECT a.username FROM account a\n" +
+            ") t";
+    private static String sql44 = "SELECT t.* FROM (\n" +
+            "\t\t SELECT u.username FROM `user`  u\n" +
+            "\t\t\tunion \n" +
+            "\t\t\tSELECT a.username FROM account a\n" +
+            ") t JOIN  role r ON r.id = t.role_id";
+
+    private static String sql45 = "select a,b from test1 temp where temp.a = 'a' AND temp.id in(\n" +
+            "\t\t SELECT u.id FROM `user`  u\n" +
+            "\t\t\tunion \n" +
+            "\t\t\tSELECT a.id FROM account a\n" +
+            ")";
+
     public static void main(String[] args) {
         DefaultSqlParser defaultSqlParser = new DefaultSqlParser();
+        TenantServiceImpl tenantService = new TenantServiceImpl();
+        defaultSqlParser.setTenantService(tenantService);
         defaultSqlParser.setTenantInfoHandler(new TenantInfoHandler() {
             @Override
             public List getTenantIds() {
@@ -141,6 +161,11 @@ public class TenantDemo {
             @Override
             public String getTenantIdColumn() {
                 return "tenant_id";
+            }
+
+            @Override
+            public List<String> ignoreDynamicDatasource() {
+                return null;
             }
         });
 
@@ -227,6 +252,12 @@ public class TenantDemo {
         System.out.println(defaultSqlParser.setTenantParameter(sql41));
         System.out.println("------------------------------------- \n");
         System.out.println(defaultSqlParser.setTenantParameter(sql42));
+        System.out.println("------------------------------------- \n");
+        System.out.println(defaultSqlParser.setTenantParameter(sql43));
+        System.out.println("------------------------------------- \n");
+        System.out.println(defaultSqlParser.setTenantParameter(sql44));
+        System.out.println("------------------------------------- \n");
+        System.out.println(defaultSqlParser.setTenantParameter(sql45));
 
     }
 }

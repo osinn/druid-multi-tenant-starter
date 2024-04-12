@@ -2,6 +2,7 @@ package com.github.osinn.druid.multi.tenant.plugin.starter;
 
 import com.alibaba.druid.DbType;
 import com.alibaba.druid.util.JdbcConstants;
+import com.github.osinn.druid.multi.tenant.plugin.service.ITenantService;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -40,6 +41,12 @@ public class TenantProperties {
      * 忽略表名前缀
      */
     private List<String> ignoreTableNamePrefix = new ArrayList<>();
+
+    /**
+     * 忽略数据-多数据源情况下指定需要忽略的数据源
+     * 需要重写 {@link ITenantService#ignoreDynamicDatasource} 方法，提供获取当前执行的数据源名称
+     */
+    private List<String> ignoreDynamicDatasource = new ArrayList<>();
 
     /**
      * 是否使用MyBatis拦截器方式修改sql,需要禁用druidFilterEnable

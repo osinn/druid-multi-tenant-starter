@@ -36,7 +36,7 @@ public class StartSysListener implements ApplicationListener<ContextRefreshedEve
         log.debug("添加自定义Mybatis多租户SQL拦截器");
         for (SqlSessionFactory sqlSessionFactory : sqlSessionFactoryList) {
             // 添加拦截器
-            sqlSessionFactory.getConfiguration().addInterceptor(new MybatisMultiTenantPluginInterceptor(new TenantInfoHandler() {
+            sqlSessionFactory.getConfiguration().addInterceptor(new MybatisMultiTenantPluginInterceptor(tenantService, new TenantInfoHandler() {
 
                 @Override
                 public List getTenantIds() {
@@ -61,6 +61,11 @@ public class StartSysListener implements ApplicationListener<ContextRefreshedEve
                 @Override
                 public String getTenantIdColumn() {
                     return tenantProperties.getTenantIdColumn();
+                }
+
+                @Override
+                public List<String> ignoreDynamicDatasource() {
+                    return tenantProperties.getIgnoreDynamicDatasource();
                 }
 
                 @Override
