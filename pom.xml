@@ -10,7 +10,7 @@
     </parent>
     <groupId>io.github.osinn</groupId>
     <artifactId>druid-multi-tenant-starter</artifactId>
-    <version>1.4.4</version>
+    <version>1.4.5</version>
     <name>druid-multi-tenant-starter</name>
     <description>druid-multi-tenant-starter</description>
 
@@ -49,7 +49,7 @@
 
     <properties>
         <java.version>1.8</java.version>
-        <druid.version>1.2.15</druid.version>
+        <druid.version>1.2.22</druid.version>
         <mybatis.version>2.2.0</mybatis.version>
     </properties>
     <dependencies>

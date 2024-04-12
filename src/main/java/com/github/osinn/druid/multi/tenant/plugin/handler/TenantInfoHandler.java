@@ -59,4 +59,9 @@ public interface TenantInfoHandler {
      * @return 租户字段名
      */
     String getTenantIdColumn();
+
+    /**
+     * 忽略数据-多数据源情况下指导忽略的数据源
+     */
+    List<String> ignoreDynamicDatasource();
 }
