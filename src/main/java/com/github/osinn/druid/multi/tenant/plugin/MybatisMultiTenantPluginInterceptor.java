@@ -14,6 +14,8 @@ import org.apache.ibatis.plugin.*;
 import org.apache.ibatis.session.ResultHandler;
 import org.apache.ibatis.session.RowBounds;
 
+import java.util.Map;
+
 /**
  * 共享数据库的多租户系统 MyBatis sql 拦截器
  *
@@ -40,24 +42,26 @@ public class MybatisMultiTenantPluginInterceptor implements Interceptor {
     @Override
     public Object intercept(Invocation invocation) throws Throwable {
 
-        if(DEFAULT_SQL_PARSER.isIgnoreDynamicDatasource()) {
+        if (DEFAULT_SQL_PARSER.isIgnoreDynamicDatasource()) {
             return invocation.proceed();
         }
 
         Object target = invocation.getTarget();
         if (target instanceof Executor) {
             MappedStatement ms = (MappedStatement) invocation.getArgs()[0];
-
-            BoundSql boundSql = ms.getBoundSql(invocation.getArgs()[1]);
+            Object param1 = invocation.getArgs()[1];
+            BoundSql boundSql = ms.getBoundSql(param1);
 
             //根据方法忽略多租户字段
             if (TenantInfoHandler.IGNORE_TENANT_ID_METHODS.contains(ms.getId())) {
                 return invocation.proceed();
             }
+            //获取mapper 接口上租户字段参数值
+            Object paramTenantId = getParamTenantId(param1);
             // 获取原始sql
             String sql = boundSql.getSql();
             // 得到修改后的sql
-            sql = DEFAULT_SQL_PARSER.setTenantParameter(sql);
+            sql = DEFAULT_SQL_PARSER.setTenantParameter(sql, paramTenantId);
             BoundSql newBoundSql = new BoundSql(
                     ms.getConfiguration(),
                     sql,
@@ -113,6 +117,16 @@ public class MybatisMultiTenantPluginInterceptor implements Interceptor {
         builder.flushCacheRequired(ms.isFlushCacheRequired());
         builder.useCache(ms.isUseCache());
         return builder.build();
+    }
+
+    private Object getParamTenantId(Object param1) {
+        if (param1 instanceof Map) {
+            TenantInfoHandler tenantInfoHandler = DEFAULT_SQL_PARSER.getTenantInfoHandler();
+            String tenantIdColumn = tenantInfoHandler.getTenantIdColumn();
+            Map<?, ?> paramMap = (Map<?, ?>) param1;
+            return paramMap.getOrDefault(tenantIdColumn, null);
+        }
+        return null;
     }
 
     /**

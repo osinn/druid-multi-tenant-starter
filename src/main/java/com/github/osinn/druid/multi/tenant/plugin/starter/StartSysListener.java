@@ -7,15 +7,15 @@ import com.github.osinn.druid.multi.tenant.plugin.service.ITenantService;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.event.ApplicationStartedEvent;
 import org.springframework.context.ApplicationListener;
-import org.springframework.context.event.ContextRefreshedEvent;
 
 import java.util.List;
 
 /**
  * @author wency_cai
  */
-public class StartSysListener implements ApplicationListener<ContextRefreshedEvent> {
+public class StartSysListener implements ApplicationListener<ApplicationStartedEvent> {
 
     private static Logger log = LoggerFactory.getLogger(StartSysListener.class);
 
@@ -32,7 +32,7 @@ public class StartSysListener implements ApplicationListener<ContextRefreshedEve
     }
 
     @Override
-    public void onApplicationEvent(ContextRefreshedEvent event) {
+    public void onApplicationEvent(ApplicationStartedEvent event) {
         log.debug("添加自定义Mybatis多租户SQL拦截器");
         for (SqlSessionFactory sqlSessionFactory : sqlSessionFactoryList) {
             // 添加拦截器

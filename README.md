@@ -6,10 +6,6 @@
 - demo地址：[https://github.com/osinn/druid-multi-tenant-demo](https://github.com/osinn/druid-multi-tenant-demo)
 - jdk1.8+
 
-# 支持
-- [x] Mybatis Plus
-- [x] Mybatis PageHelper 分页插件
-
 # 支持忽略tenantId策略
 - [x] 支持原SQL语句中已有tenantId字段条件跳过
 - [x] 支持忽略指定表名添加tenantId字段条件
@@ -24,22 +20,31 @@
 <dependency>
     <groupId>io.github.osinn</groupId>
     <artifactId>druid-multi-tenant-starter</artifactId>
-    <version>1.4.6</version>
+    <version>1.4.7</version>
 </dependency>
 ```
 
 # 配置
 ```
+--基础配置
 mybatis:
   tenant:
     config:
-      # 是否使用MyBatis拦截器方式修改sql,需要禁用druidFilterEnable
+      # 是否启用多租户插件
+      enable: true
+      # 数据库中租户ID的列名
+      tenant-id-column: tenant_id
+
+--完整配置参数   
+mybatis:
+  tenant:
+    config:
+      # 是否使用MyBatis拦截器方式修改sql
       enable: true
       # 数据库方言
       db-type: mysql
       # 是否忽略表按租户ID过滤,默认所有表都按租户ID过滤，指定表名称(区分大小写全等判断)
       ignore-table-name:
-#        - user
         - user_role
       ignore-match-table-alias
       # 匹配判断指定表别名称是否忽略表按租户ID过滤(区分大小写匹配判断)
@@ -52,8 +57,6 @@ mybatis:
         - demoDataSource
       # 数据库中租户ID的列名
       tenant-id-column: tenant_id
-      # 是否使用druid过滤器方式修改sql,依赖druid数据库连接池,需要禁用enable=false
-      druid-filter-enable: false
 ```
 - 如果SQL中表名不在 `ignore-table-name` 中，则去`ignore-match-table-alias`匹配查找
 - 执行SQL中存在临时表可以约束指定 `ignore-match-table-alias` 匹配临时表别名来忽略临时表添加租户ID查询条件
@@ -87,6 +90,20 @@ public class TenantServiceImpl implements ITenantService<Integer>{
 ```
 - 到此整合完成
 
+# 租户ID从Mapper接口方法中传入
+> 默认调用 ITenantService.getTenantIds() 接口方法获取租户ID
+```
+public interface UserMapper {
+
+    /**
+     * 传入租户ID值，支持传入List或Set集合
+     */
+    User getUserInfoById(@Param("userId") Long userId, @Param("tenant_id") Long tenantId);
+}
+```
+- @Param("tenant_id") 中的值 tenant_id <font color=#FF000 >**约定**</font>对应的是 yml 配置 tenant-id-column 的值
+- 如果Mapper接口方法中传入租户ID，则不会调用 ITenantService.getTenantIds() 接口方法获取租户ID
+
 # 多租户忽略Mapper方法
 ```
 public interface UserMapper {
@@ -98,8 +115,8 @@ public interface UserMapper {
     void deleteTestIgnoreTenantIdById(Long id);
 }
 ```
-
-# select语句
+# 以下是解析修改后的SQL语句效果
+## select语句
 ```sql
 SELECT id, name, tenant_id
 FROM role
@@ -371,7 +388,7 @@ FROM role
 WHERE tenant_id = 1
 	AND tenant_id = 11
 ```
-# update语句
+## update语句
 ```sql
 UPDATE user u
 SET ds = ?, u.name = ?, id = 'fdf', ddd = ?
@@ -437,14 +454,14 @@ END
 WHERE id IN (11, 22, 33, 3)
 	AND tenant_id = 11;
 ```
-# insert语句
+## insert语句
 ```sql
 INSERT INTO `user` (`id`, `username`, `password`, tenant_id)
 VALUES (?, ?, ?, 11),
 	(?, ?, ?, 11),
 	(?, ?, ?, 11)
 ```
-# delete语句
+## delete语句
 ```sql
 DELETE FROM user
 WHERE id = 1

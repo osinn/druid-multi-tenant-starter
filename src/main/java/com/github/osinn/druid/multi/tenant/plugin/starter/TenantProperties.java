@@ -49,14 +49,9 @@ public class TenantProperties {
     private List<String> ignoreDynamicDatasource = new ArrayList<>();
 
     /**
-     * 是否使用MyBatis拦截器方式修改sql,需要禁用druidFilterEnable
+     * 是否使用MyBatis拦截器方式修改sql
      */
     private boolean enable;
-
-    /**
-     * 是否使用druid过滤器方式修改sql,需要禁用enable
-     */
-    private boolean druidFilterEnable;
 
     /**
      * 数据库方言

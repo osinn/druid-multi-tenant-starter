@@ -2,6 +2,7 @@ package com.github.osinn.druid.multi.tenant.plugin.starter;
 
 import com.github.osinn.druid.multi.tenant.plugin.service.ITenantService;
 import org.apache.ibatis.session.SqlSessionFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -21,6 +22,7 @@ import java.util.List;
 public class MybatisMultiTenantAutoConfigure {
 
     @Bean
+    @ConditionalOnMissingBean(StartSysListener.class)
     public StartSysListener startSysListener(ITenantService tenantService, TenantProperties tenantProperties, List<SqlSessionFactory> sqlSessionFactoryList) {
         return new StartSysListener(tenantService, tenantProperties, sqlSessionFactoryList);
     }

@@ -8,8 +8,10 @@ import com.github.osinn.druid.multi.tenant.plugin.handler.TenantInfoHandler;
 import com.github.osinn.druid.multi.tenant.plugin.service.ITenantService;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 /**
  * sql解析器实现
@@ -31,26 +33,31 @@ public class DefaultSqlParser implements SqlParser {
 
     @Override
     public String setTenantParameter(String sql) {
-        if (isEmpty(this.tenantInfoHandler.getTenantIds())) {
+        return setTenantParameter(sql, null);
+    }
+
+    @Override
+    public String setTenantParameter(String sql, Object paramTenantId) {
+        if (isEmpty(getTenantId(paramTenantId))) {
             return sql;
         }
         List<SQLStatement> statementList = SQLUtils.parseStatements(sql, tenantInfoHandler.getDbType());
         SQLStatement statement = statementList.get(0);
         if (statement instanceof SQLSelectStatement) {
             SQLSelectStatement sqlSelectStatement = (SQLSelectStatement) statement;
-            processSelectBody(sqlSelectStatement.getSelect().getQuery());
+            processSelectBody(sqlSelectStatement.getSelect().getQuery(), paramTenantId);
         } else if (statement instanceof SQLInsertStatement) {
-            processInsert((SQLInsertStatement) statement);
+            processInsert((SQLInsertStatement) statement, paramTenantId);
         } else if (statement instanceof SQLUpdateStatement) {
-            processUpdate((SQLUpdateStatement) statement);
+            processUpdate((SQLUpdateStatement) statement, paramTenantId);
         } else if (statement instanceof SQLDeleteStatement) {
-            processDelete((SQLDeleteStatement) statement);
+            processDelete((SQLDeleteStatement) statement, paramTenantId);
         }
         return statement.toString();
     }
 
     @Override
-    public void processSelectBody(SQLSelectQuery sqlSelectQuery) {
+    public void processSelectBody(SQLSelectQuery sqlSelectQuery, Object paramTenantId) {
         // 非union的查询语句
         if (sqlSelectQuery instanceof SQLSelectQueryBlock) {
             SQLSelectQueryBlock sqlSelectQueryBlock = (SQLSelectQueryBlock) sqlSelectQuery;
@@ -60,12 +67,12 @@ public class DefaultSqlParser implements SqlParser {
                 if (sqlSelectItem.getExpr() instanceof SQLQueryExpr) {
                     SQLQueryExpr expr = (SQLQueryExpr) sqlSelectItem.getExpr();
                     SQLSelectQuery query = expr.getSubQuery().getQuery();
-                    processSelectBody(query);
+                    processSelectBody(query, paramTenantId);
                 } else if (sqlSelectItem.getExpr() instanceof SQLExistsExpr) {
                     // 处理exists查询
                     SQLExistsExpr sqlExistsExpr = (SQLExistsExpr) sqlSelectItem.getExpr();
                     SQLSelectQuery query = sqlExistsExpr.getSubQuery().getQuery();
-                    processSelectBody(query);
+                    processSelectBody(query, paramTenantId);
                 }
             });
 
@@ -77,7 +84,7 @@ public class DefaultSqlParser implements SqlParser {
                 SQLExpr where = sqlSelectQueryBlock.getWhere();
 
                 // 处理where 语句中多个in条件
-                this.whereIn(where);
+                this.whereIn(where, paramTenantId);
                 String alias = this.getAlias(from);
                 // 构造新的 where
                 String tableName = null;
@@ -94,7 +101,7 @@ public class DefaultSqlParser implements SqlParser {
                 }
 
                 if (!isContainsTenantIdCondition) {
-                    SQLExpr newWhereCondition = this.createNewWhereCondition(tableName, where, alias);
+                    SQLExpr newWhereCondition = this.createNewWhereCondition(tableName, where, alias, paramTenantId);
                     sqlSelectQueryBlock.setWhere(newWhereCondition);
                 }
             } else if (table instanceof SQLJoinTableSource) {
@@ -102,21 +109,21 @@ public class DefaultSqlParser implements SqlParser {
                 SQLTableSource left = joinTable.getLeft();
                 SQLTableSource right = joinTable.getRight();
 
-                this.joinCondition(left);
-                this.joinCondition(right);
+                this.joinCondition(left, paramTenantId);
+                this.joinCondition(right, paramTenantId);
                 String tableName = null;
                 if (right instanceof SQLExprTableSource) {
                     SQLExprTableSource sqlExprTableSource = (SQLExprTableSource) right;
                     tableName = sqlExprTableSource.getExpr().toString();
                 }
 
-                SQLExpr tenantCondition = getTenantCondition(tableName, right.getAlias(), joinTable.getCondition());
+                SQLExpr tenantCondition = getTenantCondition(tableName, right.getAlias(), joinTable.getCondition(), paramTenantId);
                 if (tenantCondition != null) {
                     joinTable.addCondition(tenantCondition);
                 }
                 SQLExpr condition = joinTable.getCondition();
                 // 处理where 语句中多个in条件
-                this.whereIn(condition);
+                this.whereIn(condition, paramTenantId);
 
                 String alias = this.getAlias(left);
 
@@ -137,30 +144,30 @@ public class DefaultSqlParser implements SqlParser {
                     }
                 }
 
-                SQLExpr newWhereCondition = this.createNewWhereCondition(tableName, where, alias);
+                SQLExpr newWhereCondition = this.createNewWhereCondition(tableName, where, alias, paramTenantId);
                 sqlSelectQueryBlock.setWhere(newWhereCondition);
             } else if (table instanceof SQLSubqueryTableSource) {
                 // 例如 "select a,b from (select * from table_a) temp where temp.a = 'a';"
                 // 子查询作为表
                 SQLSubqueryTableSource subQueryTable = (SQLSubqueryTableSource) table;
                 SQLSelectQuery query = subQueryTable.getSelect().getQuery();
-                processSelectBody(query);
+                processSelectBody(query, paramTenantId);
             } else if (table instanceof SQLUnionQueryTableSource) {
                 SQLUnionQueryTableSource sqlUnionQueryTableSource = (SQLUnionQueryTableSource) table;
                 // 处理union的查询语句
                 SQLUnionQuery sqlUnionQuery = sqlUnionQueryTableSource.getUnion();
-                unionQuery(sqlUnionQuery);
+                unionQuery(sqlUnionQuery, paramTenantId);
             }
 
         } else if (sqlSelectQuery instanceof SQLUnionQuery) {
             // 处理union的查询语句
             SQLUnionQuery sqlUnionQuery = (SQLUnionQuery) sqlSelectQuery;
-            unionQuery(sqlUnionQuery);
+            unionQuery(sqlUnionQuery, paramTenantId);
         }
     }
 
     @Override
-    public void processInsert(SQLInsertStatement insert) {
+    public void processInsert(SQLInsertStatement insert, Object paramTenantId) {
         List<SQLExpr> columns = insert.getColumns();
         for (SQLExpr column : columns) {
             if (isContainsTenantIdCondition(column)) {
@@ -172,8 +179,8 @@ public class DefaultSqlParser implements SqlParser {
         if (ignoreTable(tableName)) {
             return;
         }
-        List<Object> tenantIds = this.tenantInfoHandler.getTenantIds();
-        if (tenantIds == null || tenantIds.size() == 0) {
+        List<Object> tenantIds = this.getTenantId(paramTenantId);
+        if (tenantIds.size() == 0) {
             return;
         }
         insert.addColumn(new SQLIdentifierExpr(this.tenantInfoHandler.getTenantIdColumn()));
@@ -182,7 +189,7 @@ public class DefaultSqlParser implements SqlParser {
     }
 
     @Override
-    public void processUpdate(SQLUpdateStatement update) {
+    public void processUpdate(SQLUpdateStatement update, Object paramTenantId) {
         SQLTableSource sqlTableSource = update.getTableSource();
         String alias = sqlTableSource.getAlias();
         String tableName = sqlTableSource.toString();
@@ -190,20 +197,20 @@ public class DefaultSqlParser implements SqlParser {
             SQLJoinTableSource joinTable = (SQLJoinTableSource) sqlTableSource;
             SQLTableSource left = joinTable.getLeft();
             SQLTableSource right = joinTable.getRight();
-            this.joinCondition(left);
-            this.joinCondition(right);
+            this.joinCondition(left, paramTenantId);
+            this.joinCondition(right, paramTenantId);
             if (right instanceof SQLExprTableSource) {
                 SQLExprTableSource sqlExprTableSource = (SQLExprTableSource) right;
                 tableName = sqlExprTableSource.getExpr().toString();
             }
-            SQLExpr tenantCondition = getTenantCondition(tableName, right.getAlias(), joinTable.getCondition());
+            SQLExpr tenantCondition = getTenantCondition(tableName, right.getAlias(), joinTable.getCondition(), paramTenantId);
             if (tenantCondition != null) {
                 joinTable.addCondition(tenantCondition);
             }
 
             SQLExpr condition = joinTable.getCondition();
             // 处理where 语句中多个in条件
-            this.whereIn(condition);
+            this.whereIn(condition, paramTenantId);
             if (left instanceof SQLJoinTableSource) {
                 alias = ((SQLJoinTableSource) left).getLeft().getAlias();
             } else {
@@ -216,18 +223,18 @@ public class DefaultSqlParser implements SqlParser {
             tableName = ((SQLExprTableSource) sqlTableSource).getExpr().toString();
         }
 
-        SQLExpr tenantCondition = getTenantCondition(tableName, alias, update.getWhere());
+        SQLExpr tenantCondition = getTenantCondition(tableName, alias, update.getWhere(), paramTenantId);
         if (tenantCondition != null) {
             update.addCondition(tenantCondition);
         }
         SQLExpr where = update.getWhere();
         // 处理where 语句中多个in条件
-        this.whereIn(where);
+        this.whereIn(where, paramTenantId);
 
     }
 
     @Override
-    public void processDelete(SQLDeleteStatement delete) {
+    public void processDelete(SQLDeleteStatement delete, Object paramTenantId) {
         SQLTableSource tableSource = delete.getTableSource();
         String alias = tableSource.getAlias();
         String tableName = null;
@@ -240,19 +247,19 @@ public class DefaultSqlParser implements SqlParser {
             }
             SQLTableSource left = joinTable.getLeft();
             SQLTableSource right = joinTable.getRight();
-            this.joinCondition(left);
-            this.joinCondition(right);
+            this.joinCondition(left, paramTenantId);
+            this.joinCondition(right, paramTenantId);
             if (right instanceof SQLExprTableSource) {
                 SQLExprTableSource sqlExprTableSource = (SQLExprTableSource) right;
                 tableName = sqlExprTableSource.getExpr().toString();
             }
-            SQLExpr tenantCondition = getTenantCondition(tableName, right.getAlias(), joinTable.getCondition());
+            SQLExpr tenantCondition = getTenantCondition(tableName, right.getAlias(), joinTable.getCondition(), paramTenantId);
             if (tenantCondition != null) {
                 joinTable.addCondition(tenantCondition);
             }
             SQLExpr condition = joinTable.getCondition();
             // 处理where 语句中多个in条件
-            this.whereIn(condition);
+            this.whereIn(condition, paramTenantId);
 
             if (left instanceof SQLJoinTableSource) {
                 alias = ((SQLJoinTableSource) left).getLeft().getAlias();
@@ -264,13 +271,13 @@ public class DefaultSqlParser implements SqlParser {
             SQLExprTableSource sqlExprTableSource = (SQLExprTableSource) tableSource;
             tableName = sqlExprTableSource.getExpr().toString();
         }
-        SQLExpr tenantCondition = getTenantCondition(tableName, alias, delete.getWhere());
+        SQLExpr tenantCondition = getTenantCondition(tableName, alias, delete.getWhere(), paramTenantId);
         if (tenantCondition != null) {
             delete.addCondition(tenantCondition);
         }
         SQLExpr where = delete.getWhere();
         // 处理where 语句中多个in条件
-        this.whereIn(where);
+        this.whereIn(where, paramTenantId);
 
     }
 
@@ -279,7 +286,7 @@ public class DefaultSqlParser implements SqlParser {
      *
      * @param sqlTableSource
      */
-    private void joinCondition(SQLTableSource sqlTableSource) {
+    private void joinCondition(SQLTableSource sqlTableSource, Object paramTenantId) {
         if (sqlTableSource instanceof SQLJoinTableSource) {
             SQLJoinTableSource sqlJoinTableSource = (SQLJoinTableSource) sqlTableSource;
             SQLTableSource left = sqlJoinTableSource.getLeft();
@@ -292,37 +299,37 @@ public class DefaultSqlParser implements SqlParser {
                 SQLExprTableSource sqlExprTableSource = (SQLExprTableSource) left;
                 tableName = sqlExprTableSource.getExpr().toString();
             }
-            SQLExpr tenantCondition = getTenantCondition(tableName, sqlJoinTableSource.getRight().getAlias(), sqlJoinTableSource.getCondition());
+            SQLExpr tenantCondition = getTenantCondition(tableName, sqlJoinTableSource.getRight().getAlias(), sqlJoinTableSource.getCondition(), paramTenantId);
 
             if (tenantCondition != null) {
                 sqlJoinTableSource.addCondition(tenantCondition);
             }
-            joinCondition(left);
-            joinCondition(right);
+            joinCondition(left, paramTenantId);
+            joinCondition(right, paramTenantId);
         } else if (sqlTableSource instanceof SQLSubqueryTableSource) {
             // 子查询作为表
             SQLSubqueryTableSource subQueryTable = (SQLSubqueryTableSource) sqlTableSource;
             SQLSelectQuery query = subQueryTable.getSelect().getQuery();
-            processSelectBody(query);
+            processSelectBody(query, paramTenantId);
         } else if (sqlTableSource instanceof SQLUnionQueryTableSource) {
             SQLUnionQueryTableSource sqlUnionQueryTableSource = (SQLUnionQueryTableSource) sqlTableSource;
             // 处理union的查询语句
             SQLUnionQuery sqlUnionQuery = sqlUnionQueryTableSource.getUnion();
-            unionQuery(sqlUnionQuery);
+            unionQuery(sqlUnionQuery, paramTenantId);
         }
     }
 
-    private SQLExpr createNewWhereCondition(String tableName, SQLExpr where, String alias) {
+    private SQLExpr createNewWhereCondition(String tableName, SQLExpr where, String alias, Object paramTenantId) {
         // 如果是表达式
         if (where != null) {
             if (where instanceof SQLBinaryOpExpr) {
                 SQLBinaryOpExpr sqlExpr = (SQLBinaryOpExpr) where;
                 SQLExpr right = sqlExpr.getRight();
                 // 处理 where 条件中in查询
-                whereIn(right);
+                whereIn(right, paramTenantId);
             }
 
-            SQLExpr tenantCondition = this.getTenantCondition(tableName, alias, where);
+            SQLExpr tenantCondition = this.getTenantCondition(tableName, alias, where, paramTenantId);
             if (tenantCondition == null) {
                 return where;
             }
@@ -336,7 +343,7 @@ public class DefaultSqlParser implements SqlParser {
             // 返回新的条件
             return sqlBinaryOpExpr;
         } else {
-            return this.getTenantCondition(tableName, alias, where);
+            return this.getTenantCondition(tableName, alias, where, paramTenantId);
         }
     }
 
@@ -345,24 +352,24 @@ public class DefaultSqlParser implements SqlParser {
      *
      * @param sqlExpr
      */
-    private void whereIn(SQLExpr sqlExpr) {
+    private void whereIn(SQLExpr sqlExpr, Object paramTenantId) {
         if (sqlExpr instanceof SQLInSubQueryExpr) {
             SQLSelect subQuery = ((SQLInSubQueryExpr) sqlExpr).getSubQuery();
             SQLSelectQueryBlock selectQueryBlock = subQuery.getQueryBlock();
             if (selectQueryBlock != null) {
-                processSelectBody(selectQueryBlock);
+                processSelectBody(selectQueryBlock, paramTenantId);
             } else {
                 SQLSelectQuery query = subQuery.getQuery();
                 if (query instanceof SQLUnionQuery) {
                     // 处理union的查询语句
                     SQLUnionQuery sqlUnionQuery = (SQLUnionQuery) query;
-                    unionQuery(sqlUnionQuery);
+                    unionQuery(sqlUnionQuery, paramTenantId);
                 }
             }
         } else if (sqlExpr instanceof SQLBinaryOpExpr) {
             SQLBinaryOpExpr sqlBinaryOpExpr = (SQLBinaryOpExpr) sqlExpr;
-            this.whereIn(sqlBinaryOpExpr.getLeft());
-            this.whereIn(sqlBinaryOpExpr.getRight());
+            this.whereIn(sqlBinaryOpExpr.getLeft(), paramTenantId);
+            this.whereIn(sqlBinaryOpExpr.getRight(), paramTenantId);
         }
     }
 
@@ -372,11 +379,11 @@ public class DefaultSqlParser implements SqlParser {
      * @param alias 表别名
      * @return 返回条件
      */
-    private SQLExpr getTenantCondition(String tableName, String alias, SQLExpr condition) {
+    private SQLExpr getTenantCondition(String tableName, String alias, SQLExpr condition, Object paramTenantId) {
         if (isContainsTenantIdCondition(condition) || ignoreTable(tableName) || ignoreTableAlias(alias)) {
             return null;
         }
-        List<Object> tenantIds = this.tenantInfoHandler.getTenantIds();
+        List<Object> tenantIds = this.getTenantId(paramTenantId);
         if (tenantIds.size() == 1) {
             return conditionEquality(alias, tenantIds.get(0));
         } else if (tenantIds.size() > 1) {
@@ -384,6 +391,27 @@ public class DefaultSqlParser implements SqlParser {
         } else {
             return null;
         }
+    }
+
+    private List<Object> getTenantId(Object paramTenantId) {
+        List<Object> tenantIds = null;
+        if (paramTenantId != null) {
+            tenantIds = new ArrayList<>();
+            if (paramTenantId instanceof List) {
+                tenantIds.addAll((List<?>) paramTenantId);
+            } else if (paramTenantId instanceof Set) {
+                tenantIds.addAll((Set<?>) paramTenantId);
+            } else {
+                tenantIds.add(paramTenantId);
+            }
+        }
+        if (tenantIds == null) {
+            tenantIds = this.tenantInfoHandler.getTenantIds();
+            if (tenantIds == null) {
+                tenantIds = new ArrayList<>();
+            }
+        }
+        return tenantIds;
     }
 
     private SQLBinaryOpExpr conditionEquality(String alias, Object tenantId) {
@@ -463,8 +491,8 @@ public class DefaultSqlParser implements SqlParser {
      *
      * @param sqlUnionQuery
      */
-    private void unionQuery(SQLUnionQuery sqlUnionQuery) {
-        sqlUnionQuery.getRelations().forEach(this::processSelectBody);
+    private void unionQuery(SQLUnionQuery sqlUnionQuery, Object paramTenantId) {
+        sqlUnionQuery.getRelations().forEach(sqlSelectQuery -> processSelectBody(sqlSelectQuery, paramTenantId));
     }
 
     /**
@@ -571,6 +599,10 @@ public class DefaultSqlParser implements SqlParser {
 
     public void setTenantInfoHandler(TenantInfoHandler tenantInfoHandler) {
         this.tenantInfoHandler = tenantInfoHandler;
+    }
+
+    public TenantInfoHandler getTenantInfoHandler() {
+        return this.tenantInfoHandler;
     }
 
     public void setTenantService(ITenantService tenantService) {
