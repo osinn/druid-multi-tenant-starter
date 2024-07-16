@@ -3,6 +3,7 @@
 
 **需要注意的是，插件最终会认为每个表都会存在租户ID字段，所以，每个表都应该出现租户ID字段，否则需要在配置中明确指出需要忽略的表，忽略的表将不会拼接租户ID字段查询条件，临时表亦是如此(否则临时表结果集中需要出现租户ID字段)**
 
+- 项目地址：[https://github.com/osinn/druid-multi-tenant-starter](https://github.com/osinn/druid-multi-tenant-starter)
 - demo地址：[https://github.com/osinn/druid-multi-tenant-demo](https://github.com/osinn/druid-multi-tenant-demo)
 - jdk1.8+
 
