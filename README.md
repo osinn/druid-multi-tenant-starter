@@ -5,7 +5,8 @@
 
 - jdk1.8+
 - 支持 Spring boot 2.x & Spring boot 3.x
-- demo地址：[https://github.com/osinn/druid-multi-tenant-demo](https://github.com/osinn/druid-multi-tenant-demo)
+- 项目地址：[https://github.com/osinn/druid-multi-tenant-starter](https://github.com/osinn/druid-multi-tenant-starter)
+- 演示地址：[https://github.com/osinn/druid-multi-tenant-demo](https://github.com/osinn/druid-multi-tenant-demo)
 
 # 支持忽略tenantId策略
 - [x] 支持原SQL语句中已有tenantId字段条件跳过
