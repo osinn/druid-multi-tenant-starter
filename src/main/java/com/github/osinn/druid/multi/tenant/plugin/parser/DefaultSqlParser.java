@@ -42,18 +42,27 @@ public class DefaultSqlParser implements SqlParser {
             return sql;
         }
         List<SQLStatement> statementList = SQLUtils.parseStatements(sql, tenantInfoHandler.getDbType());
-        SQLStatement statement = statementList.get(0);
-        if (statement instanceof SQLSelectStatement) {
-            SQLSelectStatement sqlSelectStatement = (SQLSelectStatement) statement;
-            processSelectBody(sqlSelectStatement.getSelect().getQuery(), paramTenantId);
-        } else if (statement instanceof SQLInsertStatement) {
-            processInsert((SQLInsertStatement) statement, paramTenantId);
-        } else if (statement instanceof SQLUpdateStatement) {
-            processUpdate((SQLUpdateStatement) statement, paramTenantId);
-        } else if (statement instanceof SQLDeleteStatement) {
-            processDelete((SQLDeleteStatement) statement, paramTenantId);
+
+        // 支持多语句情况
+        StringBuilder stringBuilder = new StringBuilder();
+        for (SQLStatement statement : statementList) {
+            if (statement instanceof SQLSelectStatement) {
+                SQLSelectStatement sqlSelectStatement = (SQLSelectStatement) statement;
+                processSelectBody(sqlSelectStatement.getSelect().getQuery(), paramTenantId);
+            } else if (statement instanceof SQLInsertStatement) {
+                processInsert((SQLInsertStatement) statement, paramTenantId);
+            } else if (statement instanceof SQLUpdateStatement) {
+                processUpdate((SQLUpdateStatement) statement, paramTenantId);
+            } else if (statement instanceof SQLDeleteStatement) {
+                processDelete((SQLDeleteStatement) statement, paramTenantId);
+            }
+            // 大多数场景是一条语句,直接返回
+            if (statementList.size() == 1) {
+                return statement.toString();
+            }
+            stringBuilder.append(statement.toString());
         }
-        return statement.toString();
+        return stringBuilder.toString();
     }
 
     @Override
@@ -138,9 +147,18 @@ public class DefaultSqlParser implements SqlParser {
                     tableName = sqlExprTableSource.getExpr().toString();
                 } else if (left instanceof SQLJoinTableSource) {
                     SQLJoinTableSource joinTableSource = (SQLJoinTableSource) left;
-                    if (joinTableSource.getLeft() instanceof SQLExprTableSource) {
-                        SQLExprTableSource sqlExprTableSource = (SQLExprTableSource) joinTableSource.getLeft();
-                        tableName = sqlExprTableSource.getExpr().toString();
+                    // 修复多层join时,应该多次递归查找原表,例如 (a left join b left join c left join d) 并且 d在白名单
+                    // 此时会导致where条件中无法为a设置租户条件
+                    while (true) {
+                        if (joinTableSource.getLeft() instanceof SQLExprTableSource) {
+                            SQLExprTableSource sqlExprTableSource = (SQLExprTableSource) joinTableSource.getLeft();
+                            tableName = sqlExprTableSource.getExpr().toString();
+                            break;
+                        } else if (joinTableSource.getLeft() instanceof SQLJoinTableSource) {
+                            joinTableSource = (SQLJoinTableSource) joinTableSource.getLeft();
+                        } else {
+                            break;
+                        }
                     }
                 }
 
@@ -186,6 +204,24 @@ public class DefaultSqlParser implements SqlParser {
         insert.addColumn(new SQLIdentifierExpr(this.tenantInfoHandler.getTenantIdColumn()));
         Object tenantId = tenantIds.get(0);
         insert.getValuesList().forEach(valuesClause -> valuesClause.addValue(tenantId));
+
+        // 处理 insert select用法
+        SQLSelect query = insert.getQuery();
+        if (query != null) {
+            SQLSelectQuery sqlSelectQuery = query.getQuery();
+            // 处理条件
+            processSelectBody(sqlSelectQuery, paramTenantId);
+            // 处理查询字段
+            if (sqlSelectQuery instanceof SQLSelectQueryBlock) {
+                SQLSelectQueryBlock block = (SQLSelectQueryBlock) sqlSelectQuery;
+                String tenantIdColumn = this.tenantInfoHandler.getTenantIdColumn();
+                SQLSelectItem selectItem = block.findSelectItem(tenantIdColumn);
+                // 查询字段不包括租户,需要添加上
+                if (selectItem == null) {
+                    block.addSelectItem(tenantIdColumn, null);
+                }
+            }
+        }
     }
 
     @Override
