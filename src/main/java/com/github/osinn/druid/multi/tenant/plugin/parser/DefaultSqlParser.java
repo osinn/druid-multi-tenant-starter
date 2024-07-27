@@ -147,18 +147,10 @@ public class DefaultSqlParser implements SqlParser {
                     tableName = sqlExprTableSource.getExpr().toString();
                 } else if (left instanceof SQLJoinTableSource) {
                     SQLJoinTableSource joinTableSource = (SQLJoinTableSource) left;
-                    // 修复多层join时,应该多次递归查找原表,例如 (a left join b left join c left join d) 并且 d在白名单
-                    // 此时会导致where条件中无法为a设置租户条件
-                    while (true) {
-                        if (joinTableSource.getLeft() instanceof SQLExprTableSource) {
-                            SQLExprTableSource sqlExprTableSource = (SQLExprTableSource) joinTableSource.getLeft();
-                            tableName = sqlExprTableSource.getExpr().toString();
-                            break;
-                        } else if (joinTableSource.getLeft() instanceof SQLJoinTableSource) {
-                            joinTableSource = (SQLJoinTableSource) joinTableSource.getLeft();
-                        } else {
-                            break;
-                        }
+                    SQLExprTableSource exprTableSource = lastJoinTableSourceLeadTable(joinTableSource);
+                    if (exprTableSource != null) {
+                        tableName = exprTableSource.getTableName();
+                        alias = exprTableSource.getAlias();
                     }
                 }
 
@@ -248,7 +240,15 @@ public class DefaultSqlParser implements SqlParser {
             }
             if (left instanceof SQLExprTableSource) {
                 tableName = ((SQLExprTableSource) left).getExpr().toString();
+            } else if (left instanceof SQLJoinTableSource) {
+                SQLJoinTableSource joinTableSource = (SQLJoinTableSource) left;
+                SQLExprTableSource exprTableSource = lastJoinTableSourceLeadTable(joinTableSource);
+                if (exprTableSource != null) {
+                    tableName = exprTableSource.getTableName();
+                    alias = exprTableSource.getAlias();
+                }
             }
+
         } else if (sqlTableSource instanceof SQLExprTableSource) {
             tableName = ((SQLExprTableSource) sqlTableSource).getExpr().toString();
         }
@@ -296,11 +296,21 @@ public class DefaultSqlParser implements SqlParser {
             } else {
                 alias = left.getAlias();
             }
-
+            if (left instanceof SQLExprTableSource) {
+                tableName = ((SQLExprTableSource) left).getExpr().toString();
+            } else if (left instanceof SQLJoinTableSource) {
+                SQLJoinTableSource joinTableSource = (SQLJoinTableSource) left;
+                SQLExprTableSource exprTableSource = lastJoinTableSourceLeadTable(joinTableSource);
+                if (exprTableSource != null) {
+                    tableName = exprTableSource.getTableName();
+                    alias = exprTableSource.getAlias();
+                }
+            }
         } else if (tableSource instanceof SQLExprTableSource) {
             SQLExprTableSource sqlExprTableSource = (SQLExprTableSource) tableSource;
             tableName = sqlExprTableSource.getExpr().toString();
         }
+
         SQLExpr tenantCondition = getTenantCondition(tableName, alias, delete.getWhere(), paramTenantId);
         if (tenantCondition != null) {
             delete.addCondition(tenantCondition);
@@ -562,6 +572,27 @@ public class DefaultSqlParser implements SqlParser {
                 }
             }
         }
+    }
+
+    /**
+     * SQL语句 存在 join 查找最后的where条件的主表，例如 DELETE FROM test_table sp LEFT JOIN test_table1 re ON sp.id=re.data_id 查找 test_table 表
+     *
+     * @param joinTableSource join语句
+     * @return
+     */
+    private SQLExprTableSource lastJoinTableSourceLeadTable(SQLJoinTableSource joinTableSource) {
+        SQLExprTableSource sqlExprTableSource = null;
+        while (true) {
+            if (joinTableSource.getLeft() instanceof SQLExprTableSource) {
+                sqlExprTableSource = (SQLExprTableSource) joinTableSource.getLeft();
+                break;
+            } else if (joinTableSource.getLeft() instanceof SQLJoinTableSource) {
+                joinTableSource = (SQLJoinTableSource) joinTableSource.getLeft();
+            } else {
+                break;
+            }
+        }
+        return sqlExprTableSource;
     }
 
     /**

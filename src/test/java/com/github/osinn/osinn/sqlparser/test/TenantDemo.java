@@ -39,7 +39,7 @@ public class TenantDemo {
             @Override
             public List<String> ignoreTableName() {
                 List<String> objects = new ArrayList<>();
-                objects.add("role");
+//                objects.add("test_table4");
                 return objects;
             }
 
@@ -67,6 +67,20 @@ public class TenantDemo {
                 return null;
             }
         });
+
+//        int index = 0;
+//        for (Map.Entry<String, String> item : ExplainResult.getExplainResult().entrySet()) {
+//            String explainSQL = item.getKey();
+//            String result = item.getValue();
+//            index++;
+//            String tenantSQL = defaultSqlParser.setTenantParameter(explainSQL);
+//            System.out.println("### 测试用例" + index);
+//            System.out.println("```");
+//            System.out.println("原SQL   -------------------------------------------------------------------------- \n" + explainSQL);
+//            System.out.println("预期SQL -------------------------------------------------------------------------- \n" + result);
+//            System.out.println("结果SQL -------------------------------------------------------------------------- \n" + tenantSQL);
+//            System.out.println("```");
+//        }
 
 //        int index = 0;
 //        boolean outSQL = false;
@@ -204,6 +218,10 @@ public class TenantDemo {
         System.out.println(defaultSqlParser.setTenantParameter(ExplainResult.sql52));
         System.out.println("------------------------------------- \n");
         System.out.println(defaultSqlParser.setTenantParameter(ExplainResult.sql53));
+        System.out.println("------------------------------------- \n");
+        System.out.println(defaultSqlParser.setTenantParameter(ExplainResult.sql54));
+        System.out.println("------------------------------------- \n");
+        System.out.println(defaultSqlParser.setTenantParameter(ExplainResult.sql55));
 
     }
 }

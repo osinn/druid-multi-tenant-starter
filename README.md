@@ -1,7 +1,7 @@
 # druid-multi-tenant-starter
 <p align="center">
     <a  href="https://github.com/osinn/druid-multi-tenant-starter"><img src="https://badgen.net/github/license/osinn/druid-multi-tenant-starter" ></a>
-    <a href="https://github.com/osinn/druid-multi-tenant-starter/releases"><img src="https://badgen.net/github/release/osinn/druid-multi-tenant-starter" ></a>
+    <a href="https://github.com/osinn/druid-multi-tenant-starter/releases"><img src="https://badgen.net/github/release/osinn/druid-multi-tenant-starter?cache=300" ></a>
     <a href="https://github.com/osinn/druid-multi-tenant-starter"><img src="https://badgen.net/github/stars/osinn/druid-multi-tenant-starter" ></a>
     <a href="https://github.com/osinn/druid-multi-tenant-starter"><img src="https://badgen.net/github/forks/osinn/druid-multi-tenant-starter" ></a>
     <a href="https://github.com/osinn/druid-multi-tenant-starter"><img src="https://img.shields.io/badge/JDK-1.8+-green.svg?color=blue" ></a>

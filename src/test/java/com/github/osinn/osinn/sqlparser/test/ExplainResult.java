@@ -136,6 +136,26 @@ public class ExplainResult {
     public static final String sql53 = "INSERT INTO role (id, `name`, tenant_id)\n" +
             "SELECT rt.id, rt.`name`, rt.tenant_id\n" +
             "FROM role_test rt JOIN user_role ur ON ur.role_id = rt.id AND ur.user_id = 1";
+
+    public static final String sql54 = "UPDATE role m\n" +
+            "\t\tJOIN role1 t ON m.id = t.test_id\n" +
+            "\t\tJOIN role2 t1 ON t1.id = t.test_id\n" +
+            "\t\tJOIN role3 t2 ON t2.id = t.test_id\n" +
+            "\t\tJOIN role4 t3 ON t3.id = t.test_id\n" +
+            "\t\tSET m.numb = m.numb + 1,\n" +
+            "\t\t\t\tt.is_del = 0\n" +
+            "WHERE t.is_del = 0 AND t.ddd_id = 111";
+
+    public static final String sql55 = "DELETE " +
+            "FROM " +
+            " test_table sp " +
+            " LEFT JOIN test_table1 re ON sp.id = re.data_id " +
+            " LEFT JOIN test_table2 sr ON sr.id = re.role_id " +
+            " LEFT JOIN test_table3 sr1 ON sr1.id = re.role_id " +
+            " LEFT JOIN test_table4 sr2 ON sr2.id = re.role_id " +
+            "WHERE\n" +
+            " sr.id =1";
+
     public static final Map<String, String> EXPLAIN_RESULT = new LinkedHashMap<>();
 
     static {
@@ -684,6 +704,42 @@ public class ExplainResult {
                         "\t\tAND ur.user_id = 1\n" +
                         "\t\tAND ur.tenant_id = 1540616714700591104\n" +
                         "WHERE rt.tenant_id = 1540616714700591104");
+
+        EXPLAIN_RESULT.put(sql54,
+                "UPDATE role m\n" +
+                        "\tJOIN role1 t\n" +
+                        "\tON m.id = t.test_id\n" +
+                        "\t\tAND t.tenant_id = 1540616714700591104\n" +
+                        "\tJOIN role2 t1\n" +
+                        "\tON t1.id = t.test_id\n" +
+                        "\t\tAND t1.tenant_id = 1540616714700591104\n" +
+                        "\tJOIN role3 t2\n" +
+                        "\tON t2.id = t.test_id\n" +
+                        "\t\tAND t2.tenant_id = 1540616714700591104\n" +
+                        "\tJOIN role4 t3\n" +
+                        "\tON t3.id = t.test_id\n" +
+                        "\t\tAND t3.tenant_id = 1540616714700591104\n" +
+                        "SET m.numb = m.numb + 1, t.is_del = 0\n" +
+                        "WHERE t.is_del = 0\n" +
+                        "\tAND t.ddd_id = 111\n" +
+                        "\tAND m.tenant_id = 1540616714700591104");
+
+        EXPLAIN_RESULT.put(sql55,
+                "DELETE FROM test_table sp\n" +
+                        "\tLEFT JOIN test_table1 re\n" +
+                        "\tON sp.id = re.data_id\n" +
+                        "\t\tAND re.tenant_id = 1540616714700591104\n" +
+                        "\tLEFT JOIN test_table2 sr\n" +
+                        "\tON sr.id = re.role_id\n" +
+                        "\t\tAND sr.tenant_id = 1540616714700591104\n" +
+                        "\tLEFT JOIN test_table3 sr1\n" +
+                        "\tON sr1.id = re.role_id\n" +
+                        "\t\tAND sr1.tenant_id = 1540616714700591104\n" +
+                        "\tLEFT JOIN test_table4 sr2\n" +
+                        "\tON sr2.id = re.role_id\n" +
+                        "\t\tAND sr2.tenant_id = 1540616714700591104\n" +
+                        "WHERE sr.id = 1\n" +
+                        "\tAND sp.tenant_id = 1540616714700591104");
     }
 
     public static Map<String, String> getExplainResult() {
