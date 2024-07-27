@@ -186,11 +186,19 @@ public class DefaultSqlParser implements SqlParser {
 
     @Override
     public void processInsert(SQLInsertStatement insert, Object paramTenantId) {
+        boolean isInsertFieldExistTenantIdColumn = false;
+        String tenantIdColumn = this.tenantInfoHandler.getTenantIdColumn();
         List<SQLExpr> columns = insert.getColumns();
         for (SQLExpr column : columns) {
             if (isContainsTenantIdCondition(column)) {
+                // insert 语句中包含tenant_id字段，也要检查是否使用了insert select语法
+                this.handlerInsertSelect(insert, tenantIdColumn, paramTenantId);
                 // 包含租户ID不再处理
                 return;
+            }
+            // insert 语句中是否包含租户ID字段, 例如 INSERT INTO role (id, `name`, tenant_id)
+            if (column.toString().contains(tenantIdColumn)) {
+                isInsertFieldExistTenantIdColumn = true;
             }
         }
         String tableName = insert.getTableName().toString();
@@ -201,27 +209,13 @@ public class DefaultSqlParser implements SqlParser {
         if (tenantIds.size() == 0) {
             return;
         }
-        insert.addColumn(new SQLIdentifierExpr(this.tenantInfoHandler.getTenantIdColumn()));
-        Object tenantId = tenantIds.get(0);
-        insert.getValuesList().forEach(valuesClause -> valuesClause.addValue(tenantId));
-
-        // 处理 insert select用法
-        SQLSelect query = insert.getQuery();
-        if (query != null) {
-            SQLSelectQuery sqlSelectQuery = query.getQuery();
-            // 处理条件
-            processSelectBody(sqlSelectQuery, paramTenantId);
-            // 处理查询字段
-            if (sqlSelectQuery instanceof SQLSelectQueryBlock) {
-                SQLSelectQueryBlock block = (SQLSelectQueryBlock) sqlSelectQuery;
-                String tenantIdColumn = this.tenantInfoHandler.getTenantIdColumn();
-                SQLSelectItem selectItem = block.findSelectItem(tenantIdColumn);
-                // 查询字段不包括租户,需要添加上
-                if (selectItem == null) {
-                    block.addSelectItem(tenantIdColumn, null);
-                }
-            }
+        // 如果insert 没有指定租户ID字段，认为是插入全部字段包括租户ID，不需要额外处理添加租户ID字段，否则需要添加
+        if (!columns.isEmpty() && !isInsertFieldExistTenantIdColumn) {
+            insert.addColumn(new SQLIdentifierExpr(this.tenantInfoHandler.getTenantIdColumn()));
+            Object tenantId = tenantIds.get(0);
+            insert.getValuesList().forEach(valuesClause -> valuesClause.addValue(tenantId));
         }
+        this.handlerInsertSelect(insert, tenantIdColumn, paramTenantId);
     }
 
     @Override
@@ -532,6 +526,45 @@ public class DefaultSqlParser implements SqlParser {
     }
 
     /**
+     * insert select 语法插入，例如 INSERT INTO role SELECT * FROM role_test
+     *
+     * @param insert         insert 对象
+     * @param tenantIdColumn 租户ID字段
+     * @param paramTenantId  mapper 接口租户ID
+     */
+    private void handlerInsertSelect(SQLInsertStatement insert, String tenantIdColumn, Object paramTenantId) {
+        // 处理 insert select用法
+        SQLSelect query = insert.getQuery();
+        if (query != null) {
+            SQLSelectQuery sqlSelectQuery = query.getQuery();
+            // 处理 SELECT 语句条件
+            processSelectBody(sqlSelectQuery, paramTenantId);
+            // 处理查询字段
+            if (sqlSelectQuery instanceof SQLSelectQueryBlock) {
+                SQLSelectQueryBlock block = (SQLSelectQueryBlock) sqlSelectQuery;
+
+                boolean isExistTenantIdColumn = false;
+                for (SQLSelectItem sqlSelectItem : block.getSelectList()) {
+                    String expr = sqlSelectItem.getExpr().toString();
+                    // 如果 insert 中 select 语句结果集包含租户ID字段或者 结果集为 * 则不需要添加租户ID字段
+                    if (expr.contains(tenantIdColumn) || "*".equals(expr)) {
+                        isExistTenantIdColumn = true;
+                        break;
+                    }
+                }
+
+                if (!isExistTenantIdColumn) {
+                    SQLSelectItem selectItem = block.findSelectItem(tenantIdColumn);
+                    // 查询字段不包括租户,需要添加上
+                    if (selectItem == null) {
+                        block.addSelectItem(tenantIdColumn, null);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * 根据表名判断是否需要忽略
      *
      * @param tableName 表名
@@ -598,7 +631,7 @@ public class DefaultSqlParser implements SqlParser {
         if (isEmpty(ignoreMatchTableAlias)) {
             return false;
         } else {
-            return ignoreMatchTableAlias.stream().allMatch(tableAlias::contains);
+            return ignoreMatchTableAlias.stream().anyMatch(tableAlias::equals);
         }
     }
 
@@ -660,6 +693,6 @@ public class DefaultSqlParser implements SqlParser {
         if (ignoreDynamicDatasource == null || ignoreDynamicDatasource.length() == 0 || isEmpty(ignoreDynamicDatasourceList)) {
             return false;
         }
-        return ignoreDynamicDatasourceList.contains(ignoreDynamicDatasource);
+        return ignoreDynamicDatasourceList.stream().anyMatch(ignoreDynamicDatasource::equals);
     }
 }

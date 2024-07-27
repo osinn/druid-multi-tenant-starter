@@ -1,4 +1,13 @@
 # druid-multi-tenant-starter
+<p align="center">
+    <a  href="https://github.com/osinn/druid-multi-tenant-starter"><img src="https://badgen.net/github/license/osinn/druid-multi-tenant-starter" ></a>
+    <a href="https://github.com/osinn/druid-multi-tenant-starter/releases"><img src="https://badgen.net/github/release/osinn/druid-multi-tenant-starter" ></a>
+    <a href="https://github.com/osinn/druid-multi-tenant-starter"><img src="https://badgen.net/github/stars/osinn/druid-multi-tenant-starter" ></a>
+    <a href="https://github.com/osinn/druid-multi-tenant-starter"><img src="https://badgen.net/github/forks/osinn/druid-multi-tenant-starter" ></a>
+    <a href="https://github.com/osinn/druid-multi-tenant-starter"><img src="https://img.shields.io/badge/JDK-1.8+-green.svg?color=blue" ></a>
+    <a href="https://github.com/osinn/druid-multi-tenant-starter"><img src="https://img.shields.io/badge/Spring boot-2.x & 3.x-green.svg?color=blue" ></a>
+</p>
+
 > 目标多租户插件，快速集成，开箱即用，支持单个租户以及多个租户，基于alibaba druid 解析SQL，开发过程中只需要像平时一样写SQL语句即可，执行SQL最终会被拦截串改，最终把租户字段添加到SQL语句中，生成新的SQL语句，此过程你无需关心是如何添加。
 
 **需要注意的是，插件最终会认为每个表都会存在租户ID字段，所以，每个表都应该出现租户ID字段，否则需要在配置中明确指出需要忽略的表，忽略的表将不会拼接租户ID字段查询条件，临时表亦是如此(否则临时表结果集中需要出现租户ID字段)**
@@ -7,6 +16,7 @@
 - 支持 Spring boot 2.x & Spring boot 3.x
 - 项目地址：[https://github.com/osinn/druid-multi-tenant-starter](https://github.com/osinn/druid-multi-tenant-starter)
 - 演示地址：[https://github.com/osinn/druid-multi-tenant-demo](https://github.com/osinn/druid-multi-tenant-demo)
+- 测试用例：[https://github.com/osinn/druid-multi-tenant-starter/wiki](https://github.com/osinn/druid-multi-tenant-starter/wiki)
 
 # 支持忽略tenantId策略
 - [x] 支持原SQL语句中已有tenantId字段条件跳过
@@ -22,7 +32,7 @@
 <dependency>
     <groupId>io.github.osinn</groupId>
     <artifactId>druid-multi-tenant-starter</artifactId>
-    <version>1.4.8</version>
+    <version>最新版本</version>
 </dependency>
 ```
 

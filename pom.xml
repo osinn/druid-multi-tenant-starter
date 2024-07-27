@@ -10,7 +10,7 @@
     </parent>
     <groupId>io.github.osinn</groupId>
     <artifactId>druid-multi-tenant-starter</artifactId>
-    <version>1.4.8</version>
+    <version>1.4.9</version>
     <name>druid-multi-tenant-starter</name>
     <description>druid-multi-tenant-starter</description>
 
