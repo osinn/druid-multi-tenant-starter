@@ -662,7 +662,7 @@ public class DefaultSqlParser implements SqlParser {
         if (isEmpty(ignoreMatchTableAlias)) {
             return false;
         } else {
-            return ignoreMatchTableAlias.stream().anyMatch(tableAlias::equals);
+            return ignoreMatchTableAlias.stream().anyMatch(tableAlias::contains);
         }
     }
 
