@@ -38,13 +38,25 @@ public class DefaultSqlParser implements SqlParser {
 
     @Override
     public String setTenantParameter(String sql, Object paramTenantId) {
+
+        String customizeParserSQL = tenantService.customizeParser(sql, paramTenantId);
+
+        if (customizeParserSQL != null && customizeParserSQL.length() > 0) {
+            return customizeParserSQL;
+        }
+
+        String beforeSql = tenantService.before(sql, paramTenantId);
+        if (beforeSql != null && beforeSql.length() > 0) {
+            sql = beforeSql;
+        }
+
         if (isEmpty(getTenantId(paramTenantId))) {
             return sql;
         }
         List<SQLStatement> statementList = SQLUtils.parseStatements(sql, tenantInfoHandler.getDbType());
 
-        // 支持多语句情况
         StringBuilder stringBuilder = new StringBuilder();
+        // 支持多语句情况
         for (SQLStatement statement : statementList) {
             if (statement instanceof SQLSelectStatement) {
                 SQLSelectStatement sqlSelectStatement = (SQLSelectStatement) statement;
@@ -56,13 +68,17 @@ public class DefaultSqlParser implements SqlParser {
             } else if (statement instanceof SQLDeleteStatement) {
                 processDelete((SQLDeleteStatement) statement, paramTenantId);
             }
-            // 大多数场景是一条语句,直接返回
-            if (statementList.size() == 1) {
-                return statement.toString();
-            }
             stringBuilder.append(statement.toString());
         }
-        return stringBuilder.toString();
+
+        String parserSql = stringBuilder.toString();
+
+        String afterSql = tenantService.after(parserSql, paramTenantId);
+        if (afterSql != null && afterSql.length() > 0) {
+            return afterSql;
+        } else {
+            return parserSql;
+        }
     }
 
     @Override

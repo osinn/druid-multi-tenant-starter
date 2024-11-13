@@ -98,6 +98,27 @@ public class TenantServiceImpl implements ITenantService<Integer>{
         // 过去当前执行的数据源名称, 空则需要执行解析设置租户ID
         return 返回当前执行的数据源名称;
     }
+    
+    // 如果开发者需要自行解析SQL，可以重新此方法，并返回新的SQL语句，返回值为空时则继续执行默认解析逻辑，有返回值则直接返回且不会执行默认的解析逻辑
+    @Override
+    public String customizeParser(String originalSQL, Object paramTenantId) {
+        return null;
+    }
+
+    // 如果开发者想要在执行默认的解析逻辑前做点什么，可以重写此方法，如果有返回值则会覆盖原始SQL语句（originalSQL）
+    @Override
+    public String before(String originalSQL, Object paramTenantId) {
+        System.out.println("执行默认解析逻辑前 执行了 before方法");
+        return null;
+    }
+
+    // 如果开发者想要在执行默认的解析逻辑后做点什么，可以重写此方法，如果有返回值则会覆盖解析后的SQL语句（newSQL）
+    @Override
+    public String after(String newSQL, Object paramTenantId) {
+        System.out.println("执行默认解析逻辑后 执行了 after方法");
+//        return newSQL + " and tenant_id = 123456";
+        return null;
+    }
 }
 ```
 - 到此整合完成
