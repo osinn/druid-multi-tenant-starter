@@ -20,10 +20,11 @@ public interface SqlParser {
     /**
      * sql语句处理入口
      *
+     * @param url 数据库连接地址
      * @param sql 语句处理入口
      * @return 返回串改后的sql语句
      */
-    String setTenantParameter(String sql, Object paramTenantId);
+    String setTenantParameter(String url, String sql, Object paramTenantId);
 
     /**
      * 解析查询语句

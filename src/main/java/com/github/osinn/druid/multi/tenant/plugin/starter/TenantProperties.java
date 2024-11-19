@@ -54,8 +54,12 @@ public class TenantProperties {
     private boolean enable;
 
     /**
-     * 数据库方言
+     * 数据库方言，如果不指定，则自动识别
      */
-    private DbType dbType = JdbcConstants.MYSQL;
+    private DbType dbType;
 
+    /**
+     * 是否开启 LOGO
+     */
+    private boolean banner = true;
 }

@@ -1,9 +1,11 @@
 package com.github.osinn.druid.multi.tenant.plugin.parser;
 
+import com.alibaba.druid.DbType;
 import com.alibaba.druid.sql.SQLUtils;
 import com.alibaba.druid.sql.ast.*;
 import com.alibaba.druid.sql.ast.expr.*;
 import com.alibaba.druid.sql.ast.statement.*;
+import com.alibaba.druid.util.JdbcUtils;
 import com.github.osinn.druid.multi.tenant.plugin.handler.TenantInfoHandler;
 import com.github.osinn.druid.multi.tenant.plugin.service.ITenantService;
 import lombok.extern.slf4j.Slf4j;
@@ -33,11 +35,11 @@ public class DefaultSqlParser implements SqlParser {
 
     @Override
     public String setTenantParameter(String sql) {
-        return setTenantParameter(sql, null);
+        return setTenantParameter(null, sql, null);
     }
 
     @Override
-    public String setTenantParameter(String sql, Object paramTenantId) {
+    public String setTenantParameter(String url, String sql, Object paramTenantId) {
 
         String customizeParserSQL = tenantService.customizeParser(sql, paramTenantId);
 
@@ -53,7 +55,15 @@ public class DefaultSqlParser implements SqlParser {
         if (isEmpty(getTenantId(paramTenantId))) {
             return sql;
         }
-        List<SQLStatement> statementList = SQLUtils.parseStatements(sql, tenantInfoHandler.getDbType());
+
+        DbType dbType = tenantInfoHandler.getDbType();
+
+        if (dbType == null) {
+            // 获取当前数据库方言，一般在多数据源模式下获取当前数据源的数据库方言
+            dbType = JdbcUtils.getDbTypeRaw(url, null);
+        }
+
+        List<SQLStatement> statementList = SQLUtils.parseStatements(sql, dbType);
 
         StringBuilder stringBuilder = new StringBuilder();
         // 支持多语句情况

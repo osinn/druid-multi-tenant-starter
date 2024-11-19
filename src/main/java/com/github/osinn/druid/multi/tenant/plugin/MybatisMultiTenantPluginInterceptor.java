@@ -56,12 +56,14 @@ public class MybatisMultiTenantPluginInterceptor implements Interceptor {
             if (TenantInfoHandler.IGNORE_TENANT_ID_METHODS.contains(ms.getId())) {
                 return invocation.proceed();
             }
+            // 获取数据库连接地址
+            String url = ms.getConfiguration().getEnvironment().getDataSource().getConnection().getMetaData().getURL();
             //获取mapper 接口上租户字段参数值
             Object paramTenantId = getParamTenantId(param1);
             // 获取原始sql
             String sql = boundSql.getSql();
             // 得到修改后的sql
-            sql = DEFAULT_SQL_PARSER.setTenantParameter(sql, paramTenantId);
+            sql = DEFAULT_SQL_PARSER.setTenantParameter(url, sql, paramTenantId);
             BoundSql newBoundSql = new BoundSql(
                     ms.getConfiguration(),
                     sql,
