@@ -222,6 +222,8 @@ public class TenantDemo {
         System.out.println(defaultSqlParser.setTenantParameter(ExplainResult.sql54));
         System.out.println("------------------------------------- \n");
         System.out.println(defaultSqlParser.setTenantParameter(ExplainResult.sql55));
+        System.out.println("------------------------------------- \n");
+        System.out.println(defaultSqlParser.setTenantParameter(ExplainResult.sql56));
 
     }
 }

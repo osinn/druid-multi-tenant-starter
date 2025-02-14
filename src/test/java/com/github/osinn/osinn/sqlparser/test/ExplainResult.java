@@ -155,6 +155,10 @@ public class ExplainResult {
             " LEFT JOIN test_table4 sr2 ON sr2.id = re.role_id " +
             "WHERE\n" +
             " sr.id =1";
+    public static final String sql56 = "SELECT * " +
+            "FROM user\n" +
+            "WHERE tenant_id = 11\n" +
+            "\tAND name = 1122";
 
     public static final Map<String, String> EXPLAIN_RESULT = new LinkedHashMap<>();
 
@@ -740,6 +744,12 @@ public class ExplainResult {
                         "\t\tAND sr2.tenant_id = 1540616714700591104\n" +
                         "WHERE sr.id = 1\n" +
                         "\tAND sp.tenant_id = 1540616714700591104");
+
+        EXPLAIN_RESULT.put(sql56,
+                "SELECT *\n" +
+                        "FROM user\n" +
+                        "WHERE (tenant_id = 11\n" +
+                        "\tAND name = 1122)");
     }
 
     public static Map<String, String> getExplainResult() {

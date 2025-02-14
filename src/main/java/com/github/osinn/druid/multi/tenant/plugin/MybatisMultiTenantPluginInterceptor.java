@@ -42,12 +42,12 @@ public class MybatisMultiTenantPluginInterceptor implements Interceptor {
     @Override
     public Object intercept(Invocation invocation) throws Throwable {
 
-        if (DEFAULT_SQL_PARSER.isIgnoreDynamicDatasource()) {
-            return invocation.proceed();
-        }
-
         Object target = invocation.getTarget();
         if (target instanceof Executor) {
+            if (DEFAULT_SQL_PARSER.isIgnoreDynamicDatasource()) {
+                return invocation.proceed();
+            }
+            Executor executor = (Executor) target;
             MappedStatement ms = (MappedStatement) invocation.getArgs()[0];
             Object param1 = invocation.getArgs()[1];
             BoundSql boundSql = ms.getBoundSql(param1);
@@ -57,7 +57,7 @@ public class MybatisMultiTenantPluginInterceptor implements Interceptor {
                 return invocation.proceed();
             }
             // 获取数据库连接地址
-            String url = ms.getConfiguration().getEnvironment().getDataSource().getConnection().getMetaData().getURL();
+            String url = executor.getTransaction().getConnection().getMetaData().getURL();
             //获取mapper 接口上租户字段参数值
             Object paramTenantId = getParamTenantId(param1);
             // 获取原始sql

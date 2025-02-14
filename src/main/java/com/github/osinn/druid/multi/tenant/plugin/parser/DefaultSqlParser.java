@@ -52,10 +52,6 @@ public class DefaultSqlParser implements SqlParser {
             sql = beforeSql;
         }
 
-        if (isEmpty(getTenantId(paramTenantId))) {
-            return sql;
-        }
-
         DbType dbType = tenantInfoHandler.getDbType();
 
         if (dbType == null) {
@@ -133,6 +129,8 @@ public class DefaultSqlParser implements SqlParser {
                 if (where instanceof SQLInListExpr) {
                     SQLInListExpr sqlExprTableSource = (SQLInListExpr) where;
                     isContainsTenantIdCondition = isContainsTenantIdCondition(sqlExprTableSource.getExpr());
+                } else {
+                    isContainsTenantIdCondition = isContainsTenantIdCondition(where);
                 }
 
                 if (!isContainsTenantIdCondition) {
@@ -538,15 +536,15 @@ public class DefaultSqlParser implements SqlParser {
         if (left instanceof SQLBinaryOpExpr || left instanceof SQLPropertyExpr) {
             isContainsTenantIdCondition = String.valueOf(left).contains(this.tenantInfoHandler.getTenantIdColumn());
         }
-        if (right instanceof SQLBinaryOpExpr) {
+        if (!isContainsTenantIdCondition && right instanceof SQLBinaryOpExpr) {
             isContainsTenantIdCondition = String.valueOf(right).contains(this.tenantInfoHandler.getTenantIdColumn());
         }
 
-        if (left instanceof SQLIdentifierExpr) {
+        if (!isContainsTenantIdCondition && left instanceof SQLIdentifierExpr) {
             isContainsTenantIdCondition = String.valueOf(left).equals(this.tenantInfoHandler.getTenantIdColumn());
         }
 
-        if (right instanceof SQLIdentifierExpr) {
+        if (!isContainsTenantIdCondition && right instanceof SQLIdentifierExpr) {
             isContainsTenantIdCondition = String.valueOf(right).equals(this.tenantInfoHandler.getTenantIdColumn());
         }
         return isContainsTenantIdCondition;
