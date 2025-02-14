@@ -18,15 +18,6 @@ public class MybatisMultiTenantAutoConfigure {
 
     @Bean
     public MyBeanPostProcessor myBeanPostProcessor(ITenantService tenantService, TenantProperties tenantProperties) {
-        // TODO 打印骚东西 Banner
-        if (tenantProperties.isBanner()) {
-            Package pkg = MybatisMultiTenantAutoConfigure.class.getPackage();
-            String version = (pkg != null ? pkg.getImplementationVersion() : "");
-            System.out.println(" _ _   |_  _ _|_. ___ _ |    _ ");
-            System.out.println("| | |\\/|_)(_| | |_\\  |_)||_|_\\ ");
-            System.out.println("     /               |         ");
-            System.out.println("                        " + version + " ");
-        }
         return new MyBeanPostProcessor(tenantService, tenantProperties);
     }
 }

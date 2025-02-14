@@ -58,8 +58,4 @@ public class TenantProperties {
      */
     private DbType dbType;
 
-    /**
-     * 是否开启 LOGO
-     */
-    private boolean banner = true;
 }
