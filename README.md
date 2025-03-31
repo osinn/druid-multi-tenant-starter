@@ -53,7 +53,7 @@ mybatis:
     config:
       # 是否使用MyBatis拦截器方式修改sql
       enable: true
-      # 数据库方言
+      # 数据库方言，可选，如果不指定会从事务数据元中自动识别获取方言类型
       db-type: mysql
       # 是否忽略表按租户ID过滤,默认所有表都按租户ID过滤，指定表名称(区分大小写全等判断)
       ignore-table-name:
