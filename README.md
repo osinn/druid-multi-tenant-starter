@@ -44,7 +44,7 @@ mybatis:
     config:
       # 是否启用多租户插件
       enable: true
-      # 数据库中租户ID的列名
+      # 数据库表租户ID的列名
       tenant-id-column: tenant_id
 
 --完整配置参数   
@@ -53,22 +53,22 @@ mybatis:
     config:
       # 是否使用MyBatis拦截器方式修改sql
       enable: true
+      # 数据库表租户ID的列名字段
+      tenant-id-column: tenant_id
       # 数据库方言，可选，如果不指定会从事务数据元中自动识别获取方言类型
       db-type: mysql
       # 是否忽略表按租户ID过滤,默认所有表都按租户ID过滤，指定表名称(区分大小写全等判断)
       ignore-table-name:
-        - user_role
+        - user_role # 内部全等判断
       ignore-match-table-alias
       # 匹配判断指定表别名称是否忽略表按租户ID过滤(区分大小写匹配判断)
-        - temp # tempTableAlias
+        - temp # 内部判断 以 temp 为前缀的别名进行忽略过滤
       # 根据表名前缀判断是否忽略表按租户ID过滤
       ignore-table-name-prefix: 
-        - act_
+        - act_ # 内部判断 以 act_ 为前缀的别名进行忽略过滤
       # 多数据源情况下指定忽略跳过的数据源名称（需要重写ITenantService接口中的ignoreDynamicDatasource方法自行提供获取当前执行的数据源名称）
       ignore-dynamic-datasource:
-        - demoDataSource
-      # 数据库中租户ID的列名
-      tenant-id-column: tenant_id
+        - demoDataSource # 内部全等判断
 ```
 - 如果SQL中表名不在 `ignore-table-name` 中，则去`ignore-match-table-alias`匹配查找
 - 执行SQL中存在临时表可以约束指定 `ignore-match-table-alias` 匹配临时表别名来忽略临时表添加租户ID查询条件
@@ -118,6 +118,18 @@ public class TenantServiceImpl implements ITenantService<Integer>{
         System.out.println("执行默认解析逻辑后 执行了 after方法");
 //        return newSQL + " and tenant_id = 123456";
         return null;
+    }
+    
+    /**
+     * 是否跳过解析，可以重写此方法，(实现当前线程全局判断是否忽略tenant_id字段)
+     * 此方法可以用在此场景，如：init()方法下执行的所有sql语句忽略添加tenant_id字段，可以自行实现 ThreadLocal
+     * 并在此方法中获取当前线程变量判断是否需要忽略添加tenant_id字段，如果需要忽略添加tenant_id字段，则返回true即可
+     *
+     * @return 返回 true 跳过解析, false 继续解析
+     */
+    @Override
+    public boolean skipParser() {
+        return false;
     }
 }
 ```

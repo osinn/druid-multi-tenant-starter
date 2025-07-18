@@ -10,7 +10,7 @@
     </parent>
     <groupId>io.github.osinn</groupId>
     <artifactId>druid-multi-tenant-starter</artifactId>
-    <version>1.5.3</version>
+    <version>1.5.4</version>
     <name>druid-multi-tenant-starter</name>
     <description>druid-multi-tenant-starter</description>
 
@@ -56,20 +56,17 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-configuration-processor</artifactId>
-            <scope>compile</scope>
             <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-autoconfigure</artifactId>
-            <scope>compile</scope>
             <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.mybatis.spring.boot</groupId>
             <artifactId>mybatis-spring-boot-starter</artifactId>
             <version>${mybatis.version}</version>
-            <scope>compile</scope>
             <optional>true</optional>
         </dependency>
         <dependency>
@@ -80,7 +77,6 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <scope>compile</scope>
             <version>1.18.24</version>
         </dependency>
     </dependencies>

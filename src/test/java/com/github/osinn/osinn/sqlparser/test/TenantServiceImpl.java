@@ -10,12 +10,12 @@ import java.util.List;
  *
  * @author wency_cai
  */
-public class TenantServiceImpl implements ITenantService<Long> {
+public class TenantServiceImpl implements ITenantService {
 
     @Override
-    public List<Long> getTenantIds() {
+    public List<Object> getTenantIds() {
         Long tenantId = 12121L;
-        List<Long> tenantIdList = new ArrayList<>();
+        List<Object> tenantIdList = new ArrayList<>();
         tenantIdList.add(tenantId);
         return tenantIdList;
     }

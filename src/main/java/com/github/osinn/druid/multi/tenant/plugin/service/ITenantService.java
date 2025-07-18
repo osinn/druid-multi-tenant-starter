@@ -7,7 +7,7 @@ import java.util.List;
  *
  * @author wency_cai
  */
-public interface ITenantService<T> {
+public interface ITenantService {
 
 
     /**
@@ -15,7 +15,7 @@ public interface ITenantService<T> {
      *
      * @return 返回租户ID集合
      */
-    List<T> getTenantIds();
+    List<Object> getTenantIds();
 
     /**
      * 多数据源-获取外部当前执行的数据源，默认所有数据源都需要设置租户ID
@@ -61,5 +61,16 @@ public interface ITenantService<T> {
      */
     default String after(String newSQL, Object paramTenantId) {
         return null;
+    }
+
+    /**
+     * 是否跳过解析，可以重写此方法，(实现当前线程全局判断是否忽略tenant_id字段)
+     * 此方法可以用在此场景，如：init()方法下执行的所有sql语句忽略添加tenant_id字段，可以自行实现 ThreadLocal
+     * 并在此方法中获取当前线程变量判断是否需要忽略添加tenant_id字段，如果需要忽略添加tenant_id字段，则返回true即可
+     *
+     * @return 返回 true 跳过解析, false 继续解析
+     */
+    default boolean skipParser() {
+        return false;
     }
 }

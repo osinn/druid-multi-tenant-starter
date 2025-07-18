@@ -461,10 +461,8 @@ public class DefaultSqlParser implements SqlParser {
         List<Object> tenantIds = null;
         if (paramTenantId != null) {
             tenantIds = new ArrayList<>();
-            if (paramTenantId instanceof List) {
-                tenantIds.addAll((List<?>) paramTenantId);
-            } else if (paramTenantId instanceof Set) {
-                tenantIds.addAll((Set<?>) paramTenantId);
+            if (paramTenantId instanceof Collection) {
+                tenantIds.addAll((Collection<?>) paramTenantId);
             } else {
                 tenantIds.add(paramTenantId);
             }
@@ -663,7 +661,7 @@ public class DefaultSqlParser implements SqlParser {
             return false;
         }
         for (String tableNamePrefix : ignoreTableNamePrefix) {
-            if (tableName.indexOf(tableNamePrefix) == 0) {
+            if (tableName.startsWith(tableNamePrefix)) {
                 return true;
             }
         }
@@ -683,11 +681,31 @@ public class DefaultSqlParser implements SqlParser {
 
         List<String> ignoreMatchTableAlias = tenantInfoHandler.ignoreMatchTableAlias();
 
-        if (isEmpty(ignoreMatchTableAlias)) {
-            return false;
-        } else {
-            return ignoreMatchTableAlias.stream().anyMatch(tableAlias::contains);
+        if (!isEmpty(ignoreMatchTableAlias)) {
+            for (String ignoreTableAlias : ignoreMatchTableAlias) {
+                if (tableAlias.startsWith(ignoreTableAlias)) {
+                    return true;
+                }
+            }
         }
+        return false;
+    }
+
+    /**
+     * 判断数据源是否直接跳过租户ID设置
+     *
+     * @return
+     */
+    public boolean isIgnoreDynamicDatasource() {
+        String ignoreDynamicDatasource = tenantService.ignoreDynamicDatasource();
+        List<String> dynamicDatasourceList = tenantInfoHandler.ignoreDynamicDatasource();
+        if (ignoreDynamicDatasource == null || ignoreDynamicDatasource.length() == 0 || isEmpty(dynamicDatasourceList)) {
+            return false;
+        }
+        for (String ignoreDynamicDatasourceItem : dynamicDatasourceList) {
+            return ignoreDynamicDatasource.equals(ignoreDynamicDatasourceItem);
+        }
+        return false;
     }
 
     /**
@@ -737,17 +755,7 @@ public class DefaultSqlParser implements SqlParser {
         return collection == null || collection.isEmpty();
     }
 
-    /**
-     * 判断数据源是否直接跳过租户ID设置
-     *
-     * @return
-     */
-    public boolean isIgnoreDynamicDatasource() {
-        String ignoreDynamicDatasource = tenantService.ignoreDynamicDatasource();
-        List<String> ignoreDynamicDatasourceList = tenantInfoHandler.ignoreDynamicDatasource();
-        if (ignoreDynamicDatasource == null || ignoreDynamicDatasource.length() == 0 || isEmpty(ignoreDynamicDatasourceList)) {
-            return false;
-        }
-        return ignoreDynamicDatasourceList.stream().anyMatch(ignoreDynamicDatasource::equals);
+    public boolean isSkipParser() {
+        return tenantService.skipParser();
     }
 }

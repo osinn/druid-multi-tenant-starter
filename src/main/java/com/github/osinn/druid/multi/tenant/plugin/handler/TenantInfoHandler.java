@@ -28,7 +28,7 @@ public interface TenantInfoHandler {
      *
      * @return 返回多租户id集合，一个或多个
      */
-    <T> List<T> getTenantIds();
+    List<Object> getTenantIds();
 
     /**
      * 根据表名判断是否忽略拼接多租户ID条件(全等判断)

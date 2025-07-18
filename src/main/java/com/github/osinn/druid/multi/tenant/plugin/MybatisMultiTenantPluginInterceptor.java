@@ -44,6 +44,9 @@ public class MybatisMultiTenantPluginInterceptor implements Interceptor {
 
         Object target = invocation.getTarget();
         if (target instanceof Executor) {
+            if (DEFAULT_SQL_PARSER.isSkipParser()) {
+                return invocation.proceed();
+            }
             if (DEFAULT_SQL_PARSER.isIgnoreDynamicDatasource()) {
                 return invocation.proceed();
             }

@@ -62,7 +62,7 @@ public class MyBeanPostProcessor implements BeanPostProcessor {
         return new MybatisMultiTenantPluginInterceptor(tenantService, new TenantInfoHandler() {
 
             @Override
-            public List getTenantIds() {
+            public List<Object> getTenantIds() {
                 return tenantService.getTenantIds();
             }
 
