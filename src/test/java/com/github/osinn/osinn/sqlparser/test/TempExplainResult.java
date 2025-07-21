@@ -8,7 +8,7 @@ import java.util.Map;
  *
  * @author wency_cai
  */
-public class ExplainResult {
+public class TempExplainResult {
 
     public static final String sql1 = "SELECT id, name,tenant_id FROM role";
     public static final String sql2 = "select * from user s where s.name='333'";
@@ -408,7 +408,8 @@ public class ExplainResult {
                         "\tJOIN user_role ur\n" +
                         "\tON ur.user_id = temp.id\n" +
                         "\t\tAND ur.tenant_id = 1540616714700591104\n" +
-                        "WHERE temp.a = 'a';");
+                        "WHERE temp.a = 'a'\n" +
+                        "\tAND temp.tenant_id = 1540616714700591104;");
         EXPLAIN_RESULT.put(sql24,
                 "SELECT id, name, tenant_id\n" +
                         "FROM role\n" +
@@ -551,11 +552,13 @@ public class ExplainResult {
                         "\tON temp1._id = t2.id\n" +
                         "\t\tAND t2.cp_delete = 0\n" +
                         "\t\tAND t2.tenant_id = 1540616714700591104\n" +
+                        "WHERE temp1.tenant_id = 1540616714700591104\n" +
                         "ORDER BY temp1.sort DESC");
 
         EXPLAIN_RESULT.put(sql39,
                 "SELECT id, name, tenant_id\n" +
-                        "FROM role temp");
+                        "FROM role temp\n" +
+                        "WHERE temp.tenant_id = 1540616714700591104");
 
         EXPLAIN_RESULT.put(sql40,
                 "SELECT *\n" +
@@ -634,7 +637,8 @@ public class ExplainResult {
                         "\t\tSELECT a.id\n" +
                         "\t\tFROM account a\n" +
                         "\t\tWHERE a.tenant_id = 1540616714700591104\n" +
-                        "\t)");
+                        "\t)\n" +
+                        "\tAND temp.tenant_id = 1540616714700591104");
 
 
 
@@ -747,8 +751,8 @@ public class ExplainResult {
         EXPLAIN_RESULT.put(sql56,
                 "SELECT *\n" +
                         "FROM user\n" +
-                        "WHERE tenant_id = 11\n" +
-                        "\tAND name = 1122");
+                        "WHERE (tenant_id = 11\n" +
+                        "\tAND name = 1122)");
     }
 
     public static Map<String, String> getExplainResult() {
