@@ -83,10 +83,10 @@ mybatis:
  * @author wency_cai
  */
 @Service
-public class TenantServiceImpl implements ITenantService<Integer>{
+public class TenantServiceImpl implements ITenantService {
 
     @Override
-    public List<Integer> getTenantIds() {
+    public List<Object> getTenantIds() {
         // 查询系统多租户id,如果有多个返回多个值即可
         int tenantId = 1;
         return Lists.newArrayList(tenantId);
