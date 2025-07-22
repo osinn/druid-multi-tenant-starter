@@ -20,10 +20,12 @@
 
 # 支持忽略tenantId策略
 - [x] 支持原SQL语句中已有tenantId字段条件跳过
-- [x] 支持忽略指定表名添加tenantId字段条件
 - [x] 支持忽略指定Mapper接口SQL语句添加tenantId字段条件
 - [x] 支持指定`表名`忽略SQL语句添加tenantId字段条件
+- [x] 支持指定`表名前缀`忽略SQL语句添加tenantId字段条件
 - [x] 支持指定`别名`忽略SQL语句添加tenantId字段条件
+- [x] 支持重写`skipParser`方法，通过获取当前线程变量判断是否`跳过SQL语句解析`添加tenantId字段条件，需要开发者自行实现逻辑判断
+- [x] 支持指定`多数据源`忽略SQL语句添加tenantId字段条件，需要开发者重写`ignoreDynamicDatasource`方法提供获取当前执行的数据源名称
 
 # 快速开始
 - 在已经集成`Mybatis`项目中引入以下依赖
