@@ -1,7 +1,7 @@
 package com.github.osinn.druid.multi.tenant.plugin.starter;
 
 import com.alibaba.druid.DbType;
-import com.alibaba.druid.util.JdbcConstants;
+import com.github.osinn.druid.multi.tenant.plugin.enums.AdvisorTypeEnum;
 import com.github.osinn.druid.multi.tenant.plugin.service.ITenantService;
 import lombok.Getter;
 import lombok.Setter;
@@ -54,8 +54,19 @@ public class TenantProperties {
     private boolean enable;
 
     /**
+     * 是否启用切面方式忽略租户ID，默认不开启
+     * 开启后 @IgnoreTenantIdField 注解不仅仅可以使用在Mapper接口上，也可以使用在Service任意接口上
+     */
+    private boolean enablePointcutAdvisor;
+
+    /**
      * 数据库方言，如果不指定，则自动识别
      */
     private DbType dbType;
+
+    /**
+     * 实现方式，默认是MyBatis
+     */
+    private AdvisorTypeEnum advisorType = AdvisorTypeEnum.mybatis;
 
 }

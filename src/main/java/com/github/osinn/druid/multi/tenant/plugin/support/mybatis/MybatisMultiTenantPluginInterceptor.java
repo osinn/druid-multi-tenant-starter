@@ -1,8 +1,9 @@
-package com.github.osinn.druid.multi.tenant.plugin;
+package com.github.osinn.druid.multi.tenant.plugin.support.mybatis;
 
 import com.github.osinn.druid.multi.tenant.plugin.handler.TenantInfoHandler;
 import com.github.osinn.druid.multi.tenant.plugin.parser.DefaultSqlParser;
 import com.github.osinn.druid.multi.tenant.plugin.service.ITenantService;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.ibatis.cache.CacheKey;
 import org.apache.ibatis.executor.Executor;
 import org.apache.ibatis.executor.statement.StatementHandler;
@@ -21,6 +22,7 @@ import java.util.Map;
  *
  * @author wency_cai
  */
+@Slf4j
 @Intercepts(
         {
                 @Signature(type = Executor.class, method = "update", args = {MappedStatement.class, Object.class}),
@@ -67,6 +69,7 @@ public class MybatisMultiTenantPluginInterceptor implements Interceptor {
             String sql = boundSql.getSql();
             // 得到修改后的sql
             sql = DEFAULT_SQL_PARSER.setTenantParameter(url, sql, paramTenantId);
+            log.debug("最终执行SQL ===========\n {} \n===========", sql);
             BoundSql newBoundSql = new BoundSql(
                     ms.getConfiguration(),
                     sql,
