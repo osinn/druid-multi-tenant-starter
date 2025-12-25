@@ -2,7 +2,6 @@ package com.github.osinn.druid.multi.tenant.plugin.support.mybatis;
 
 import com.github.osinn.druid.multi.tenant.plugin.handler.TenantInfoHandler;
 import com.github.osinn.druid.multi.tenant.plugin.parser.DefaultSqlParser;
-import com.github.osinn.druid.multi.tenant.plugin.service.ITenantService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.ibatis.cache.CacheKey;
 import org.apache.ibatis.executor.Executor;
@@ -33,12 +32,11 @@ import java.util.Map;
 public class MybatisMultiTenantPluginInterceptor implements Interceptor {
 
 
-    private static final DefaultSqlParser DEFAULT_SQL_PARSER = new DefaultSqlParser();
+    private final DefaultSqlParser defaultSqlParser;
 
 
-    public MybatisMultiTenantPluginInterceptor(ITenantService tenantService, TenantInfoHandler tenantInfoHandler) {
-        DEFAULT_SQL_PARSER.setTenantInfoHandler(tenantInfoHandler);
-        DEFAULT_SQL_PARSER.setTenantService(tenantService);
+    public MybatisMultiTenantPluginInterceptor(DefaultSqlParser defaultSqlParser) {
+        this.defaultSqlParser = defaultSqlParser;
     }
 
     @Override
@@ -46,10 +44,10 @@ public class MybatisMultiTenantPluginInterceptor implements Interceptor {
 
         Object target = invocation.getTarget();
         if (target instanceof Executor) {
-            if (DEFAULT_SQL_PARSER.isSkipParser()) {
+            if (defaultSqlParser.isSkipParser()) {
                 return invocation.proceed();
             }
-            if (DEFAULT_SQL_PARSER.isIgnoreDynamicDatasource()) {
+            if (defaultSqlParser.isIgnoreDynamicDatasource()) {
                 return invocation.proceed();
             }
             Executor executor = (Executor) target;
@@ -68,7 +66,7 @@ public class MybatisMultiTenantPluginInterceptor implements Interceptor {
             // 获取原始sql
             String sql = boundSql.getSql();
             // 得到修改后的sql
-            sql = DEFAULT_SQL_PARSER.setTenantParameter(url, sql, paramTenantId);
+            sql = defaultSqlParser.setTenantParameter(url, sql, paramTenantId);
             log.debug("最终执行SQL ===========\n {} \n===========", sql);
             BoundSql newBoundSql = new BoundSql(
                     ms.getConfiguration(),
@@ -129,7 +127,7 @@ public class MybatisMultiTenantPluginInterceptor implements Interceptor {
 
     private Object getParamTenantId(Object param1) {
         if (param1 instanceof Map) {
-            TenantInfoHandler tenantInfoHandler = DEFAULT_SQL_PARSER.getTenantInfoHandler();
+            TenantInfoHandler tenantInfoHandler = defaultSqlParser.getTenantInfoHandler();
             String tenantIdColumn = tenantInfoHandler.getTenantIdColumn();
             Map<?, ?> paramMap = (Map<?, ?>) param1;
             return paramMap.getOrDefault(tenantIdColumn, null);

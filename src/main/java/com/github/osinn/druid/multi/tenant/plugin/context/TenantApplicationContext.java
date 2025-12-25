@@ -5,7 +5,6 @@ import lombok.NonNull;
 import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
-import org.springframework.stereotype.Component;
 
 /**
  * @author wency_cai
@@ -14,12 +13,22 @@ public abstract class TenantApplicationContext implements ApplicationContextAwar
 
     private static ApplicationContext context;
 
+    private static final ThreadLocal<Boolean> IGNORE_TENANT_ID = ThreadLocal.withInitial(() -> Boolean.FALSE);
+
+
     @Override
     public boolean skipParser() {
-        if (isIgnoreTenantId()) {
-            return true;
-        }
-        return false;
+        return isIgnoreTenantId();
+    }
+
+    @Override
+    public void threadLocalSkipParserSet() {
+        ignoreTenantId();
+    }
+
+    @Override
+    public void threadLocalSkipParserClear() {
+        clear();
     }
 
     @Override
@@ -35,30 +44,26 @@ public abstract class TenantApplicationContext implements ApplicationContextAwar
         return context.getBean(beanName);
     }
 
-
-    private static final ThreadLocal<Boolean> IGNORE_TENANT_ID = ThreadLocal.withInitial(() -> Boolean.FALSE);
-
     /**
      * 忽略租户
      */
-    public static void ignoreTenantId() {
+    private void ignoreTenantId() {
         IGNORE_TENANT_ID.set(Boolean.TRUE);
     }
-
 
     /**
      * 是否忽略租户
      *
      * @return 返回 true 忽略租户
      */
-    public static boolean isIgnoreTenantId() {
+    private boolean isIgnoreTenantId() {
         return Boolean.TRUE.equals(IGNORE_TENANT_ID.get());
     }
 
     /**
      * 清理 IGNORE_TENANT_ID 上下文
      */
-    public static void clear() {
+    private void clear() {
         IGNORE_TENANT_ID.remove();
     }
 }

@@ -1,6 +1,6 @@
 package com.github.osinn.druid.multi.tenant.plugin.support.jpa;
 
-import com.github.osinn.druid.multi.tenant.plugin.support.BaseOrmTenantAdvisor;
+import com.github.osinn.druid.multi.tenant.plugin.support.ITenantSqlInterceptorStrategy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 
@@ -10,7 +10,7 @@ import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
  * @author wency_cai
  */
 @Slf4j
-public class JpaOrmTenantAdvisor implements BaseOrmTenantAdvisor {
+public class JpaTenantSqlInterceptorStrategy implements ITenantSqlInterceptorStrategy {
 
     @Override
     public Object doHandle(Object bean, String beanName) {

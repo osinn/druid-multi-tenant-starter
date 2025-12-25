@@ -7,6 +7,11 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
 
+/**
+ * 提供 Spring Boot2 获取 JPA EntityManagerFactory 支持
+ *
+ * @author wency_cai
+ */
 public class JpaEntityManagerFactoryBoot2 implements IJpaEntityManagerFactory {
 
     @Override

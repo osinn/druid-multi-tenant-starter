@@ -1,7 +1,7 @@
 package com.github.osinn.druid.multi.tenant.plugin.support;
 
 import com.github.osinn.druid.multi.tenant.plugin.annotation.IgnoreTenantIdField;
-import com.github.osinn.druid.multi.tenant.plugin.context.TenantApplicationContext;
+import com.github.osinn.druid.multi.tenant.plugin.parser.DefaultSqlParser;
 import org.aopalliance.aop.Advice;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.springframework.aop.Pointcut;
@@ -18,6 +18,12 @@ import java.lang.reflect.Method;
  */
 public class IgnoreTenantIdFieldPointcutAdvisor extends AbstractBeanFactoryPointcutAdvisor {
 
+    private DefaultSqlParser defaultSqlParser;
+
+    public IgnoreTenantIdFieldPointcutAdvisor(DefaultSqlParser defaultSqlParser) {
+        this.defaultSqlParser = defaultSqlParser;
+    }
+
     private final StaticMethodMatcherPointcut pointcut = new StaticMethodMatcherPointcut() {
         @Override
         public boolean matches(Method metmethodhod, Class<?> targetClass) {
@@ -28,11 +34,10 @@ public class IgnoreTenantIdFieldPointcutAdvisor extends AbstractBeanFactoryPoint
 
     private final Advice advice = (MethodInterceptor) invocation -> {
         try {
-
-            TenantApplicationContext.ignoreTenantId();
+            defaultSqlParser.threadLocalSkipParserSet();
             return invocation.proceed();
         } finally {
-            TenantApplicationContext.clear();
+            defaultSqlParser.threadLocalSkipParserClear();
         }
     };
 

@@ -1,7 +1,7 @@
 package com.github.osinn.druid.multi.tenant.plugin.starter;
 
 import com.alibaba.druid.DbType;
-import com.github.osinn.druid.multi.tenant.plugin.enums.AdvisorTypeEnum;
+import com.github.osinn.druid.multi.tenant.plugin.enums.SqlInterceptorStrategyEnum;
 import com.github.osinn.druid.multi.tenant.plugin.service.ITenantService;
 import lombok.Getter;
 import lombok.Setter;
@@ -20,7 +20,7 @@ import java.util.List;
 @ConfigurationProperties(prefix = TenantProperties.PREFIX)
 public class TenantProperties {
 
-    public final static String PREFIX = "mybatis.tenant.config";
+    public final static String PREFIX = "multi-tenant.config";
 
     /**
      * 数据库中租户ID的列名
@@ -54,19 +54,37 @@ public class TenantProperties {
     private boolean enable;
 
     /**
-     * 是否启用切面方式忽略租户ID，默认不开启
-     * 开启后 @IgnoreTenantIdField 注解不仅仅可以使用在Mapper接口上，也可以使用在Service任意接口上
-     */
-    private boolean enablePointcutAdvisor;
-
-    /**
      * 数据库方言，如果不指定，则自动识别
      */
     private DbType dbType;
 
     /**
-     * 实现方式，默认是MyBatis
+     * 是否为多数据源
+     *
+     * @since 1.5.6
      */
-    private AdvisorTypeEnum advisorType = AdvisorTypeEnum.mybatis;
+    private boolean enableDynamicDatasource;
+
+    /**
+     * 是否检测数据源
+     *
+     * @since 1.5.6
+     */
+    private boolean checkDataSource;
+
+    /**
+     * 是否启用切面方式忽略租户ID，默认不开启
+     * 开启后 @IgnoreTenantIdField 注解不仅仅可以使用在Mapper接口上，也可以使用在Service任意接口上
+     *
+     * @since 1.5.6
+     */
+    private boolean enablePointcutAdvisorIgnoreTenantId;
+
+    /**
+     * SQL拦截策略，默认是MyBatis拦截器
+     *
+     * @since 1.5.6
+     */
+    private SqlInterceptorStrategyEnum sqlInterceptorStrategy = SqlInterceptorStrategyEnum.mybatis_interceptor;
 
 }

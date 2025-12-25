@@ -1,5 +1,7 @@
 package com.github.osinn.druid.multi.tenant.plugin.service;
 
+import com.github.osinn.druid.multi.tenant.plugin.parser.DefaultSqlParser;
+
 import java.util.List;
 
 /**
@@ -73,4 +75,53 @@ public interface ITenantService {
     default boolean skipParser() {
         return false;
     }
+
+    /**
+     * 只有 yml 配置 enable-pointcut-advisor = true 时 内部会使用到 ThreadLocal
+     * 流程: 调用 threadLocalSkipParserSet 方法 设置是否跳过解析 ——> skipParser 从 ThreadLocal 中获取设置值判断 ——> threadLocalSkipParserClear 清理上下文
+     * 可以重写此方法实现使用自定义 ThreadLocal 实现，对应 调用 ThreadLocal 的 set 方法，即为 myThreadLocal.set(xxxx)
+     * 如果不实现此方法，会调用内部默认的 ThreadLocal 实现
+     * <p>
+     * 需要注意的是，内部使用的 ThreadLocal 不支持跨线程调用(即 方法上使用@IgnoreTenantIdField 注解，此方法内又有异步方法，在异步方法内操作数据库，此时不会生效，依然会解析设置租户ID)
+     * 如果需要支持跨线程(异步方法)，你的框架可参考使用 TransmittableThreadLocal 库创建线程池，然后实现 skipParser、threadLocalSkipParserSet、threadLocalSkipParserClear这三个方法逻辑
+     *
+     * @since 1.5.6
+     */
+    default void threadLocalSkipParserSet() {
+
+    }
+
+    /**
+     * 只有 yml 配置 enable-pointcut-advisor = true 时 内部会使用到 ThreadLocal
+     * 可以重写此方法实现使用自定义 ThreadLocal 实现，对应 调用 ThreadLocal 的 clear 方法，即为 myThreadLocal.clear()
+     * 如果不实现此方法，会调用内部默认的 ThreadLocal 实现
+     *
+     * @since 1.5.6
+     */
+    default void threadLocalSkipParserClear() {
+
+    }
+
+    /**
+     * 预留方法，当bean初始化后调用，数据源添加代理 sql 解析器
+     * yml 配置 enable-dynamic-datasource = true 时 才会调用此方法
+     * <pre>
+     * 如果项目中使用到 sleuth，应该将 sleuth 中的 jdbc 关闭掉，因为 sleuth 会将 dataSource 包装成 DataSourceWrapper 代理类
+     * spring:
+     *   sleuth:
+     *     jdbc:
+     *       enabled: false
+     * </pre>
+     *
+     * @param dataSource       数据源
+     * @param defaultSqlParser sql 解析器
+     * @return 返回 dataSource 数据源, 如果返回 null 则使用内部的简单实现逻辑，并且需要引入 baomidou 的dynamic-datasource多数据源库
+     * 内部只支持 baomidou 数据源 <a href="https://github.com/baomidou/dynamic-datasource">
+     * @since 1.5.6
+     */
+    default Object addDataSourceProxySqlParser(Object dataSource, DefaultSqlParser defaultSqlParser) {
+
+        return null;
+    }
+
 }

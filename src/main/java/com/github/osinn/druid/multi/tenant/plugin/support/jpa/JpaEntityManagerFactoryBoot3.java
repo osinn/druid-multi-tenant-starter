@@ -7,6 +7,11 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
 
+/**
+ * 提供 Spring Boot3+ 获取 JPA EntityManagerFactory 支持
+ *
+ * @author wency_cai
+ */
 public class JpaEntityManagerFactoryBoot3 implements IJpaEntityManagerFactory {
     @Override
     public String getDataSourceUrl() {

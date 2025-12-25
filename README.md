@@ -14,9 +14,15 @@
 
 - jdk1.8+
 - 支持 Spring boot 2.x & Spring boot 3.x
+- 支持JPA、Mybatis等ORM框架
 - 项目地址：[https://github.com/osinn/druid-multi-tenant-starter](https://github.com/osinn/druid-multi-tenant-starter)
 - 演示地址：[https://github.com/osinn/druid-multi-tenant-demo](https://github.com/osinn/druid-multi-tenant-demo)
 - 测试用例：[https://github.com/osinn/druid-multi-tenant-starter/wiki](https://github.com/osinn/druid-multi-tenant-starter/wiki)
+
+# 支持 SQL 拦截策略种类
+- [x] mybatis_interceptor mybatis拦截器策略，需项目使用的是mybatis ORM框架, 如果项目使用mybatis ORM 框架，推荐使用此方式
+- [x] jpa_interceptor JPA拦截器策略，需项目使用的是JPA ORM框架
+- [x] druid_filter 过滤器策略，不管是哪种 ORM框架，只需要数据库连接使用的数据源是 DruidDataSource 即可
 
 # 支持忽略tenantId策略
 - [x] 支持原SQL语句中已有tenantId字段条件跳过
@@ -26,9 +32,10 @@
 - [x] 支持指定`别名`忽略SQL语句添加tenantId字段条件
 - [x] 支持重写`skipParser`方法，通过获取当前线程变量判断是否`跳过SQL语句解析`添加tenantId字段条件，需要开发者自行实现逻辑判断
 - [x] 支持指定`多数据源`忽略SQL语句添加tenantId字段条件，需要开发者重写`ignoreDynamicDatasource`方法提供获取当前执行的数据源名称
+- [x] 支持`@IgnoreTenantIdField`注解从`1.5.6`开始支持使用在任意方法上，`1.5.5`及以下版本仅支持使用在mybatis Mapper接口方法上，需要在yml中配置`enable-pointcut-advisor-ignore-tenant-id: true`开启支持
 
 # 快速开始
-- 在已经集成`Mybatis`项目中引入以下依赖
+- 在`Spring Boot`项目中引入以下依赖
 
 ```
 <dependency>
@@ -40,52 +47,81 @@
 
 # 配置
 ```
---基础配置
-mybatis:
-  tenant:
-    config:
-      # 是否启用多租户插件
-      enable: true
-      # 数据库表租户ID的列名
-      tenant-id-column: tenant_id
+--基础配置 1.5.6版本开始 mybatis.tenant.config 改为 multi-tenant.config
+multi-tenant:
+  config:
+    # 是否启用多租户插件
+    enable: true
+    # 数据库表租户ID的列名
+    tenant-id-column: tenant_id
 
 --完整配置参数   
-mybatis:
-  tenant:
-    config:
-      # 是否使用MyBatis拦截器方式修改sql
-      enable: true
-      # 数据库表租户ID的列名字段
-      tenant-id-column: tenant_id
-      # 数据库方言，可选，如果不指定会从事务数据元中自动识别获取方言类型
-      db-type: mysql
-      # 是否忽略表按租户ID过滤,默认所有表都按租户ID过滤，指定表名称(区分大小写全等判断)
-      ignore-table-name:
-        - user_role # 内部全等判断
-      ignore-match-table-alias
-      # 匹配判断指定表别名称是否忽略表按租户ID过滤(区分大小写匹配判断)
-        - temp # 内部判断 以 temp 为前缀的别名进行忽略过滤
-      # 根据表名前缀判断是否忽略表按租户ID过滤
-      ignore-table-name-prefix: 
-        - act_ # 内部判断 以 act_ 为前缀的别名进行忽略过滤
-      # 多数据源情况下指定忽略跳过的数据源名称（需要重写ITenantService接口中的ignoreDynamicDatasource方法自行提供获取当前执行的数据源名称）
-      ignore-dynamic-datasource:
-        - demoDataSource # 内部全等判断
+multi-tenant:
+  config:
+    # 是否使用MyBatis拦截器方式修改sql
+    enable: true
+    # 数据库表租户ID的列名字段
+    tenant-id-column: tenant_id
+    # 数据库方言，可选，如果不指定会从事务数据元中自动识别获取方言类型
+    db-type: mysql
+    # SQL 拦截策略，默认 mybatis 拦截器，如果不是mybatis,且使用的是 DruidDataSource 数据源，推荐使用 druid_filter 过滤器策略
+    # druid_filter 只支持使用 DruidDataSource 数据数据源连接数据库
+    sql-interceptor-strategy: mybatis_interceptor
+    # 是否启用切面方式忽略租户ID字段，默认不开启，开启后 @IgnoreTenantIdField 注解不仅仅可以使用在mybatis Mapper接口方法上，也可以使用在Service任意接口上
+    enable-pointcut-advisor-ignore-tenant-id: false
+    # 是否忽略表按租户ID过滤,默认所有表都按租户ID过滤，指定表名称(区分大小写全等判断)
+    ignore-table-name:
+     - user_role # 内部全等判断
+    ignore-match-table-alias
+    # 匹配判断指定表别名称是否忽略表按租户ID过滤(区分大小写匹配判断)
+      - temp # 内部判断 以 temp 为前缀的别名进行忽略过滤
+    # 根据表名前缀判断是否忽略表按租户ID过滤
+    ignore-table-name-prefix: 
+      - act_ # 内部判断 以 act_ 为前缀的别名进行忽略过滤
+    # 多数据源情况下指定忽略跳过的数据源名称（需要重写ITenantService接口中的ignoreDynamicDatasource方法自行提供获取当前执行的数据源名称）
+    ignore-dynamic-datasource:
+      - demoDataSource # 内部全等判断
 ```
 - 如果SQL中表名不在 `ignore-table-name` 中，则去`ignore-match-table-alias`匹配查找
 - 执行SQL中存在临时表可以约束指定 `ignore-match-table-alias` 匹配临时表别名来忽略临时表添加租户ID查询条件
 
 # 实现提供获取多租户值接口
-- 需要实现ITenantService接口提供获取多租户ID值
+- 1.5.5及以下版本需要实现`ITenantService`接口，1.5.6版本开始需要继承`TenantApplicationContext`抽象类提供获取多租户ID值
 
+### 基础方法
+```
+/**
+ * 演示：提供多租户ID服务接口
+ * 
+ * @author wency_cai
+ * @since 1.5.6
+ */
+@Service
+public class TenantServiceImpl extends TenantApplicationContext {
+
+    @Override
+    public List<Object> getTenantIds() {
+        Long tenantId = 1L;
+        List<Object> tenantIdList = new ArrayList<>();
+        tenantIdList.add(tenantId);
+        return tenantIdList;
+    }
+
+}
+```
+### 完整方法
 ```
 /**
  * 演示：提供多租户ID服务接口
  *
  * @author wency_cai
  */
+//@Service // 1.5.5及以下版本需要实现ITenantService接口
+//public class TenantServiceImpl implements ITenantService {
+
+// 1.5.6版本开始需要继承 TenantApplicationContext 抽象类提供获取多租户ID值
 @Service
-public class TenantServiceImpl implements ITenantService {
+public class TenantServiceImpl extends TenantApplicationContext {
 
     @Override
     public List<Object> getTenantIds() {
@@ -133,12 +169,58 @@ public class TenantServiceImpl implements ITenantService {
     public boolean skipParser() {
         return false;
     }
+  
+    /**
+     * 只有 yml 配置 enable-pointcut-advisor = true 时 内部会使用到 ThreadLocal
+     * 流程: 调用 threadLocalSkipParserSet 方法 设置是否跳过解析 ——> skipParser 从 ThreadLocal 中获取设置值判断 ——> threadLocalSkipParserClear 清理上下文
+     * 可以重写此方法实现使用自定义 ThreadLocal 实现，对应 调用 ThreadLocal 的 set 方法，即为 myThreadLocal.set(xxxx)
+     * 如果不实现此方法，会调用内部默认的 ThreadLocal 实现
+     * <p>
+     * 需要注意的是，内部使用的 ThreadLocal 不支持跨线程调用(即 方法上使用@IgnoreTenantIdField 注解，此方法内又有异步方法，在异步方法内操作数据库，此时不会生效，依然会解析设置租户ID)
+     * 如果需要支持跨线程(异步方法)，你的框架可参考使用 TransmittableThreadLocal 库创建线程池，然后实现 skipParser、threadLocalSkipParserSet、threadLocalSkipParserClear这三个方法逻辑
+     *
+     * @since 1.5.6
+     */  
+    @Override
+    public void threadLocalSkipParserSet() {
+        IGNORE_TENANT.set(Boolean.TRUE);
+    }
+
+    /**
+     * 只有 yml 配置 enable-pointcut-advisor = true 时 内部会使用到 ThreadLocal
+     * 可以重写此方法实现使用自定义 ThreadLocal 实现，对应 调用 ThreadLocal 的 clear 方法，即为 myThreadLocal.clear()
+     * 如果不实现此方法，会调用内部默认的 ThreadLocal 实现
+     *
+     * @since 1.5.6
+     */
+    @Override
+    public void threadLocalSkipParserClear() {
+        IGNORE_TENANT.remove();
+    }
+    
+    /**
+     * 预留方法，当bean初始化后调用，数据源添加代理 sql 解析器
+     * yml 配置 enable-dynamic-datasource = true 时 才会调用此方法
+     *
+     * @param dataSource       数据源
+     * @param defaultSqlParser sql 解析器
+     * @return 返回 dataSource 数据源, 如果返回 null 则使用内部的简单实现逻辑，并且需要引入 baomidou 的dynamic-datasource多数据源库
+     * 内部只支持 baomidou 数据源 <a href="https://github.com/baomidou/dynamic-datasource">
+     * @since 1.5.6
+     */
+    default Object addDataSourceProxySqlParser(Object dataSource, DefaultSqlParser defaultSqlParser) {
+
+        return null;
+    }
 }
 ```
 - 到此整合完成
 
 # 租户ID从Mapper接口方法中传入
 > 默认调用 ITenantService.getTenantIds() 接口方法获取租户ID
+
+- 此方式传入tenantId值只支持 mybatis_interceptor 拦截策略(mybatis 拦截器)
+
 ```
 public interface UserMapper {
 
@@ -160,6 +242,22 @@ public interface UserMapper {
      */
     @IgnoreTenantIdField
     void deleteTestIgnoreTenantIdById(Long id);
+}
+
+multi-tenant:
+  config:
+    # 需要将此项配置设置为 true
+    enable-pointcut-advisor-ignore-tenant-id: true
+```
+# service 服务方法忽略租户ID
+```
+@Service
+public class DemoService {
+
+    @IgnoreTenantIdField
+    public Role getRole() {
+        return null;
+    }
 }
 ```
 # 以下是解析修改后的SQL语句效果
