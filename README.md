@@ -119,11 +119,9 @@ public class TenantServiceImpl extends TenantApplicationContext {
  * 演示：提供多租户ID服务接口
  *
  * @author wency_cai
+ * 
+ * @since 1.5.6 开始需要继承 TenantApplicationContext 抽象类提供获取多租户ID值
  */
-//@Service // 1.5.5及以下版本需要实现ITenantService接口
-//public class TenantServiceImpl implements ITenantService {
-
-// 1.5.6版本开始需要继承 TenantApplicationContext 抽象类提供获取多租户ID值
 @Service
 public class TenantServiceImpl extends TenantApplicationContext {
 
@@ -236,7 +234,9 @@ public interface UserMapper {
 - @Param("tenant_id") 中的值 tenant_id <font color=#FF000 >**约定**</font>对应的是 yml 配置 tenant-id-column 的值
 - 如果Mapper接口方法中传入租户ID，则不会调用 ITenantService.getTenantIds() 接口方法获取租户ID
 
-# 多租户忽略Mapper方法
+# @IgnoreTenantIdField注解使用
+### 多租户忽略Mapper方法
+- mybatis Mapper接口方法上使用
 ```
 public interface UserMapper {
 
@@ -246,13 +246,9 @@ public interface UserMapper {
     @IgnoreTenantIdField
     void deleteTestIgnoreTenantIdById(Long id);
 }
-
-multi-tenant:
-  config:
-    # 需要将此项配置设置为 true
-    enable-pointcut-advisor-ignore-tenant-id: true
 ```
-# service 服务方法忽略租户ID
+### service 服务方法忽略租户ID
+- yml配置为`enable-pointcut-advisor-ignore-tenant-id: true`，可在任意服务接口方法上使用`@IgnoreTenantIdField`注解来忽略设置多租户字段
 ```
 @Service
 public class DemoService {
@@ -262,7 +258,16 @@ public class DemoService {
         return null;
     }
 }
+
+-- 需要开启 enable-pointcut-advisor-ignore-tenant-id，如下
+multi-tenant:
+  config:
+    # 需要将此项配置设置为 true
+    enable-pointcut-advisor-ignore-tenant-id: true
 ```
+- 需要注意的是，内部使用的`ThreadLocal`设置当前线程跳过SQL解析，不支持跨线程跳过解析(即 方法上使用`@IgnoreTenantIdField` 注解，此方法内又有异步方法，在异步方法内操作数据库，此时不会生效，依然会解析设置租户ID)
+- 如果需要支持跨线程(异步方法)，你的框架可参考使用 `TransmittableThreadLocal` 库创建线程池，然后重写 `skipParser`、`threadLocalSkipParserSet`、`threadLocalSkipParserClear`这三个方法逻辑
+
 # 以下是解析修改后的SQL语句效果
 ## select语句
 ```sql
@@ -274,175 +279,175 @@ WHERE tenant_id = 11
 SELECT *
 FROM user s
 WHERE s.name = '333'
-	AND s.tenant_id = 11
+  AND s.tenant_id = 11
 ------------------------------------- 
 
 SELECT tenant_id
 FROM people
 WHERE id IN (
-		SELECT id
-		FROM user s
-		WHERE s.tenant_id = 11
-	)
-	AND tenant_id = 11
+    SELECT id
+    FROM user s
+    WHERE s.tenant_id = 11
+)
+  AND tenant_id = 11
 ------------------------------------- 
 
 SELECT tenant_id
 FROM people
 WHERE id IN (
-		SELECT id
-		FROM user s
-		WHERE s.tenant_id = 11
-	)
-	AND id IN (
-		SELECT u.id
-		FROM user u
-		WHERE u.tenant_id = 11
-	)
-	AND tenant_id = 11
+    SELECT id
+    FROM user s
+    WHERE s.tenant_id = 11
+)
+  AND id IN (
+    SELECT u.id
+    FROM user u
+    WHERE u.tenant_id = 11
+)
+  AND tenant_id = 11
 ------------------------------------- 
 
 SELECT tenant_id
 FROM people
 WHERE id IN (
-		SELECT id
-		FROM user s
-		WHERE s.tenant_id = 11
-	)
-	AND id IN (
-		SELECT u.id
-		FROM user u
-		WHERE u.tenant_id = 11
-	)
-	AND tenant_id IN (
-		SELECT u.tenant_id
-		FROM user u
-		WHERE u.tenant_id = 11
-	)
-	AND tenant_id = 11
+    SELECT id
+    FROM user s
+    WHERE s.tenant_id = 11
+)
+  AND id IN (
+    SELECT u.id
+    FROM user u
+    WHERE u.tenant_id = 11
+)
+  AND tenant_id IN (
+    SELECT u.tenant_id
+    FROM user u
+    WHERE u.tenant_id = 11
+)
+  AND tenant_id = 11
 ------------------------------------- 
 
 SELECT p.tenant_id
-	, (
-		SELECT u.name
-		FROM user u
-		WHERE u.id = p.user_id
-			AND u.tenant_id = 11
-	)
+     , (
+    SELECT u.name
+    FROM user u
+    WHERE u.id = p.user_id
+      AND u.tenant_id = 11
+)
 FROM people p
 WHERE p.tenant_id = 11
 ------------------------------------- 
 
 SELECT p.tenant_id
-	, (
-		SELECT u.name
-		FROM user u
-		WHERE u.id = p.user_id
-			AND u.tenant_id = 11
-	)
-	, (
-		SELECT s.name
-		FROM user s
-		WHERE s.id = p.user_id
-			AND s.tenant_id = 11
-	)
+     , (
+    SELECT u.name
+    FROM user u
+    WHERE u.id = p.user_id
+      AND u.tenant_id = 11
+)
+     , (
+    SELECT s.name
+    FROM user s
+    WHERE s.id = p.user_id
+      AND s.tenant_id = 11
+)
 FROM people p
 WHERE p.tenant_id = 11
 ------------------------------------- 
 
 SELECT p.tenant_id
-	, (
-		SELECT u.name
-			, (
-				SELECT s.name
-				FROM user s
-				WHERE s.id = p.user_id
-					AND s.tenant_id = 11
-			)
-		FROM user u
-		WHERE u.id = p.user_id
-			AND u.tenant_id = 11
-	)
+     , (
+    SELECT u.name
+         , (
+        SELECT s.name
+        FROM user s
+        WHERE s.id = p.user_id
+          AND s.tenant_id = 11
+    )
+    FROM user u
+    WHERE u.id = p.user_id
+      AND u.tenant_id = 11
+)
 FROM people p
 WHERE p.tenant_id = 11
 ------------------------------------- 
 
 SELECT u.*
 FROM `user` u
-	JOIN user_role ur
-	ON ur.user_id = u.id
-		AND ur.tenant_id = 11
+         JOIN user_role ur
+              ON ur.user_id = u.id
+                  AND ur.tenant_id = 11
 WHERE u.tenant_id = 11
 ------------------------------------- 
 
 SELECT u.*
 FROM `user` u
-	JOIN user_role ur
-	ON ur.user_id = u.id
-		AND u.id = 22
-		AND ur.tenant_id = 11
+         JOIN user_role ur
+              ON ur.user_id = u.id
+                  AND u.id = 22
+                  AND ur.tenant_id = 11
 WHERE u.tenant_id = 11
 ------------------------------------- 
 
 SELECT u.*
-	, (
-		SELECT ur.name
-		FROM role r
-		WHERE r.id = ur.role_id
-			AND r.tenant_id = 11
-	) AS r_name
+     , (
+    SELECT ur.name
+    FROM role r
+    WHERE r.id = ur.role_id
+      AND r.tenant_id = 11
+) AS r_name
 FROM `user` u
-	JOIN user_role ur
-	ON ur.user_id = u.id
-		AND u.id = 22
-		AND ur.tenant_id = 11
-WHERE u.tenant_id = 11
-------------------------------------- 
-
-SELECT u.*
-FROM `user` u
-	JOIN user_role ur
-	ON ur.user_id = u.id
-		AND ur.role_id IN (
-			SELECT r.id
-			FROM role r
-			WHERE r.tenant_id = 11
-		)
-		AND ur.tenant_id = 11
+         JOIN user_role ur
+              ON ur.user_id = u.id
+                  AND u.id = 22
+                  AND ur.tenant_id = 11
 WHERE u.tenant_id = 11
 ------------------------------------- 
 
 SELECT u.*
 FROM `user` u
-	JOIN user_role ur
-	ON ur.user_id = u.id
-		AND ur.role_id IN (
-			SELECT r.id
-			FROM role r
-			WHERE r.tenant_id = 11
-		)
-		AND ur.test_id IN (
-			SELECT r.test_id
-			FROM role r
-			WHERE r.tenant_id = 11
-		)
-		AND ur.tenant_id = 11
+         JOIN user_role ur
+              ON ur.user_id = u.id
+                  AND ur.role_id IN (
+                      SELECT r.id
+                      FROM role r
+                      WHERE r.tenant_id = 11
+                  )
+                  AND ur.tenant_id = 11
 WHERE u.tenant_id = 11
 ------------------------------------- 
 
 SELECT u.*
 FROM `user` u
-	LEFT JOIN user_role ur
-	ON ur.user_id = u.id
-		AND ur.tenant_id = 11
+         JOIN user_role ur
+              ON ur.user_id = u.id
+                  AND ur.role_id IN (
+                      SELECT r.id
+                      FROM role r
+                      WHERE r.tenant_id = 11
+                  )
+                  AND ur.test_id IN (
+                      SELECT r.test_id
+                      FROM role r
+                      WHERE r.tenant_id = 11
+                  )
+                  AND ur.tenant_id = 11
 WHERE u.tenant_id = 11
 ------------------------------------- 
 
 SELECT u.*
 FROM `user` u
-	RIGHT JOIN user_role ur
-	ON ur.user_id = u.id
-		AND ur.tenant_id = 11
+         LEFT JOIN user_role ur
+                   ON ur.user_id = u.id
+                       AND ur.tenant_id = 11
+WHERE u.tenant_id = 11
+------------------------------------- 
+
+SELECT u.*
+FROM `user` u
+         RIGHT JOIN user_role ur
+                    ON ur.user_id = u.id
+                        AND ur.tenant_id = 11
 WHERE u.tenant_id = 11
 ------------------------------------- 
 
@@ -454,23 +459,23 @@ HAVING COUNT(*) >= 1
 ------------------------------------- 
 
 SELECT EXISTS (
-		SELECT *
-		FROM `user`
-		WHERE username = ?
-			AND tenant_id = 11
-	) AS d
+    SELECT *
+    FROM `user`
+    WHERE username = ?
+      AND tenant_id = 11
+) AS d
 ------------------------------------- 
 
 SELECT EXISTS (
-		SELECT tenant_id
-		FROM people
-		WHERE id IN (
-				SELECT id
-				FROM user s
-				WHERE s.tenant_id = 11
-			)
-			AND tenant_id = 11
-	) AS d
+    SELECT tenant_id
+    FROM people
+    WHERE id IN (
+        SELECT id
+        FROM user s
+        WHERE s.tenant_id = 11
+    )
+      AND tenant_id = 11
+) AS d
 ------------------------------------- 
 
 SELECT username
@@ -484,154 +489,154 @@ WHERE tenant_id = 11
 
 SELECT u.*, r.id AS r_id, r.NAME AS r_name
 FROM `user` u
-	LEFT JOIN user_role ur
-	ON ur.user_id = u.id
-		AND ur.tenant_id = 11
-	LEFT JOIN role r
-	ON r.id = ur.role_id
-		AND u.id = 22
-		AND r.tenant_id = 11
+         LEFT JOIN user_role ur
+                   ON ur.user_id = u.id
+                       AND ur.tenant_id = 11
+         LEFT JOIN role r
+                   ON r.id = ur.role_id
+                       AND u.id = 22
+                       AND r.tenant_id = 11
 WHERE u.tenant_id = 11
 ------------------------------------- 
 
 SELECT u.*, r.id AS r_id, r.NAME AS r_name
 FROM `user` u
-	LEFT JOIN user_role ur
-	ON ur.user_id = u.id
-		AND ur.tenant_id = 11
-	LEFT JOIN role r
-	ON r.id = ur.role_id
-		AND u.id = 22
-		AND r.tenant_id = 11
-	LEFT JOIN menu m
-	ON m.role_id = r.id
-		AND m.tenant_id = 11
+         LEFT JOIN user_role ur
+                   ON ur.user_id = u.id
+                       AND ur.tenant_id = 11
+         LEFT JOIN role r
+                   ON r.id = ur.role_id
+                       AND u.id = 22
+                       AND r.tenant_id = 11
+         LEFT JOIN menu m
+                   ON m.role_id = r.id
+                       AND m.tenant_id = 11
 WHERE u.tenant_id = 11
 ------------------------------------- 
 
 SELECT a, b
 FROM (
-	SELECT *
-	FROM table_a
-	WHERE tenant_id = 11
-) temp
+         SELECT *
+         FROM table_a
+         WHERE tenant_id = 11
+     ) temp
 WHERE temp.a = 'a';
 ------------------------------------- 
 
 SELECT temp.*
 FROM (
-	SELECT *
-	FROM `user`
-	WHERE tenant_id = 11
-) temp
-	JOIN user_role ur
-	ON ur.user_id = temp.id
-		AND ur.tenant_id = 11
+         SELECT *
+         FROM `user`
+         WHERE tenant_id = 11
+     ) temp
+         JOIN user_role ur
+              ON ur.user_id = temp.id
+                  AND ur.tenant_id = 11
 WHERE temp.a = 'a'
-	AND temp.tenant_id = 11;
+  AND temp.tenant_id = 11;
 ------------------------------------- 
 
 SELECT id, name, tenant_id
 FROM role
 WHERE tenant_id = 1
-	AND tenant_id = 11
+  AND tenant_id = 11
 ```
 ## update语句
 ```sql
 UPDATE user u
 SET ds = ?, u.name = ?, id = 'fdf', ddd = ?
 WHERE id = ?
-	AND u.tenant_id = 11
+  AND u.tenant_id = 11
 ------------------------------------- 
 
 UPDATE user u
 SET ds = ?, u.name = ?, id = 'fdf', ddd = ?
 WHERE id IN (1, 2, 3)
-	AND u.tenant_id = 11
+  AND u.tenant_id = 11
 ------------------------------------- 
 
 UPDATE user u
 SET ds = ?, u.name = ?, id = 'fdf', ddd = ?
 WHERE id IN (
-		SELECT ur.user_id
-		FROM user_role ur
-		WHERE ur.tenant_id = 11
-	)
-	AND u.tenant_id = 11
+    SELECT ur.user_id
+    FROM user_role ur
+    WHERE ur.tenant_id = 11
+)
+  AND u.tenant_id = 11
 ------------------------------------- 
 
 UPDATE user u
 SET ds = ?, u.name = ?, id = 'fdf', ddd = ?
 WHERE id IN (
-		SELECT ur.user_id
-		FROM user_role ur
-		WHERE ur.id = 1
-			AND ur.tenant_id = 11
-	)
-	AND u.tenant_id = 11
+    SELECT ur.user_id
+    FROM user_role ur
+    WHERE ur.id = 1
+      AND ur.tenant_id = 11
+)
+  AND u.tenant_id = 11
 ------------------------------------- 
 
 UPDATE `user` u
-	JOIN user_role ur
-	ON ur.user_id = u.id
-		AND u.id = 111
-		AND ur.tenant_id = 11
-SET u.qr_code = '1212'
+    JOIN user_role ur
+ON ur.user_id = u.id
+    AND u.id = 111
+    AND ur.tenant_id = 11
+    SET u.qr_code = '1212'
 WHERE u.tenant_id = 11
 ------------------------------------- 
 
 UPDATE `user` u
-	JOIN user_role ur
-	ON ur.user_id = u.id
-		AND u.id IN (
-			SELECT urr.user_id
-			FROM user_role urr
-			WHERE urr.tenant_id = 11
-		)
-		AND ur.tenant_id = 11
-SET u.qr_code = '1212'
+    JOIN user_role ur
+ON ur.user_id = u.id
+    AND u.id IN (
+    SELECT urr.user_id
+    FROM user_role urr
+    WHERE urr.tenant_id = 11
+    )
+    AND ur.tenant_id = 11
+    SET u.qr_code = '1212'
 WHERE u.tenant_id = 11
 ------------------------------------- 
 
 UPDATE user
-SET name = CASE 
-	WHEN id = 1 THEN 'name1'
-	WHEN id = 2 THEN 'name2'
-	WHEN id = 3 THEN 'name3'
-END
+SET name = CASE
+               WHEN id = 1 THEN 'name1'
+               WHEN id = 2 THEN 'name2'
+               WHEN id = 3 THEN 'name3'
+    END
 WHERE id IN (11, 22, 33, 3)
-	AND tenant_id = 11;
+  AND tenant_id = 11;
 ```
 ## insert语句
 ```sql
 INSERT INTO `user` (`id`, `username`, `password`, tenant_id)
 VALUES (?, ?, ?, 11),
-	(?, ?, ?, 11),
-	(?, ?, ?, 11)
+       (?, ?, ?, 11),
+       (?, ?, ?, 11)
 ```
 ## delete语句
 ```sql
 DELETE FROM user
 WHERE id = 1
-	AND tenant_id = 11
+  AND tenant_id = 11
 ------------------------------------- 
 
 DELETE FROM user
 WHERE id IN (
-		SELECT id
-		FROM user s
-		WHERE s.tenant_id = 11
-	)
-	AND tenant_id = 11
+    SELECT id
+    FROM user s
+    WHERE s.tenant_id = 11
+)
+  AND tenant_id = 11
 ------------------------------------- 
 
 DELETE FROM system_permission_data sp
-	LEFT JOIN system_role_data_relation re
-	ON sp.id = re.data_id
-		AND re.tenant_id = 11
-	LEFT JOIN system_role sr
-	ON sr.id = re.role_id
-		AND sr.tenant_id = 11
+    LEFT JOIN system_role_data_relation re
+ON sp.id = re.data_id
+    AND re.tenant_id = 11
+    LEFT JOIN system_role sr
+    ON sr.id = re.role_id
+    AND sr.tenant_id = 11
 WHERE sr.id = 1
-	AND sp.tenant_id = 11
+  AND sp.tenant_id = 11
 ```
