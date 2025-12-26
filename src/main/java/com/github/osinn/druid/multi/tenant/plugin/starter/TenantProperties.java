@@ -1,6 +1,7 @@
 package com.github.osinn.druid.multi.tenant.plugin.starter;
 
 import com.alibaba.druid.DbType;
+import com.github.osinn.druid.multi.tenant.plugin.enums.DataSourceWrapperEnum;
 import com.github.osinn.druid.multi.tenant.plugin.enums.SqlInterceptorStrategyEnum;
 import com.github.osinn.druid.multi.tenant.plugin.service.ITenantService;
 import lombok.Getter;
@@ -59,18 +60,25 @@ public class TenantProperties {
     private DbType dbType;
 
     /**
-     * 是否为多数据源
+     * 是否自定义数据源
      *
      * @since 1.5.6
      */
-    private boolean enableDynamicDatasource;
+    private boolean enableCustomDataSource;
 
     /**
-     * 是否检测数据源
+     * 是否存在 sleuth jdbc 代理
      *
      * @since 1.5.6
      */
-    private boolean checkDataSource;
+    private boolean enabledSleuthJdbc = false;
+
+    /**
+     * 是否存在包装代理数据源，如果有则需要指定类型
+     *
+     * @since 1.5.6
+     */
+    private DataSourceWrapperEnum dataSourceWrapperType;
 
     /**
      * 是否启用切面方式忽略租户ID，默认不开启

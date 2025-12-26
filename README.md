@@ -81,6 +81,10 @@ multi-tenant:
     # 多数据源情况下指定忽略跳过的数据源名称（需要重写ITenantService接口中的ignoreDynamicDatasource方法自行提供获取当前执行的数据源名称）
     ignore-dynamic-datasource:
       - demoDataSource # 内部全等判断
+    # 数据源包装类型, 默认是 null
+    data-source-wrapper-type: baomidou_dynamic_data_source
+    # 是否自定义数据源，默认是 false，true时会调用addCustomDataSourceProxySqlParser()方法，用于自定义数据源添加SQL解析器
+    enable-custom-data-source: false
 ```
 - 如果SQL中表名不在 `ignore-table-name` 中，则去`ignore-match-table-alias`匹配查找
 - 执行SQL中存在临时表可以约束指定 `ignore-match-table-alias` 匹配临时表别名来忽略临时表添加租户ID查询条件

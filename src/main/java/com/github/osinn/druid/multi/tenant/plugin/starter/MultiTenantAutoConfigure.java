@@ -4,9 +4,7 @@ import com.alibaba.druid.DbType;
 import com.github.osinn.druid.multi.tenant.plugin.handler.TenantInfoHandler;
 import com.github.osinn.druid.multi.tenant.plugin.parser.DefaultSqlParser;
 import com.github.osinn.druid.multi.tenant.plugin.service.ITenantService;
-import com.github.osinn.druid.multi.tenant.plugin.support.ITenantSqlInterceptorStrategy;
-import com.github.osinn.druid.multi.tenant.plugin.support.IgnoreTenantIdFieldPointcutAdvisor;
-import com.github.osinn.druid.multi.tenant.plugin.support.TenantDataSourceProxy;
+import com.github.osinn.druid.multi.tenant.plugin.support.*;
 import com.github.osinn.druid.multi.tenant.plugin.support.druid.DruidFilterTenantSqlInterceptorStrategy;
 import com.github.osinn.druid.multi.tenant.plugin.support.jpa.IJpaEntityManagerFactory;
 import com.github.osinn.druid.multi.tenant.plugin.support.jpa.JpaEntityManagerFactoryBoot2;
@@ -20,7 +18,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import javax.sql.DataSource;
 import java.util.List;
 
 /**
@@ -119,13 +116,7 @@ public class MultiTenantAutoConfigure {
     }
 
     @Bean
-    @ConditionalOnProperty(value = TenantProperties.PREFIX + ".enable-pointcut-advisor-ignore-tenant-id", havingValue = "true")
-    public TenantDataSourceProxy tenantDataSourceProxy(DefaultSqlParser defaultSqlParser, DataSource dataSource) {
-        return new TenantDataSourceProxy(defaultSqlParser, dataSource);
-    }
-
-    @Bean
-    public TenantBeanPostProcessor myBeanPostProcessor(TenantProperties tenantPropertie, DefaultSqlParser defaultSqlParser, ITenantSqlInterceptorStrategy tenantSqlInterceptorStrategy, ITenantService tenantService) {
-        return new TenantBeanPostProcessor(tenantPropertie, defaultSqlParser, tenantSqlInterceptorStrategy, tenantService);
+    public TenantBeanPostProcessor myBeanPostProcessor(TenantProperties tenantProperties, DefaultSqlParser defaultSqlParser, ITenantSqlInterceptorStrategy tenantSqlInterceptorStrategy, ITenantService tenantService) {
+        return new TenantBeanPostProcessor(tenantProperties, defaultSqlParser, tenantSqlInterceptorStrategy, tenantService);
     }
 }
