@@ -203,16 +203,15 @@ public class TenantServiceImpl extends TenantApplicationContext {
     }
     
     /**
-     * 预留方法，当bean初始化后调用，数据源添加代理 sql 解析器
-     * yml 配置 enable-dynamic-datasource = true 时 才会调用此方法
+     * 预留方法，当bean初始化后调用，自定义数据源添加代理 sql 解析器
+     * yml 配置 enable-custom-data-source = true 时 才会调用此方法
      *
      * @param dataSource       数据源
      * @param defaultSqlParser sql 解析器
-     * @return 返回 dataSource 数据源, 如果返回 null 则使用内部的简单实现逻辑，并且需要引入 baomidou 的dynamic-datasource多数据源库
-     * 内部只支持 baomidou 数据源 <a href="https://github.com/baomidou/dynamic-datasource">
+     * @return 如果需要自定义添加数据源代理 sql 解析器，则返回调整后的 dataSource 数据源,否则返回 null
      * @since 1.5.6
      */
-    default Object addDataSourceProxySqlParser(Object dataSource, DefaultSqlParser defaultSqlParser) {
+    default Object addCustomDataSourceProxySqlParser(Object dataSource, DefaultSqlParser defaultSqlParser) {
 
         return null;
     }
