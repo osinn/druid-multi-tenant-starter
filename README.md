@@ -82,6 +82,14 @@ multi-tenant:
     ignore-dynamic-datasource:
       - demoDataSource # 内部全等判断
     # 数据源包装类型, 默认是 null
+    #项目中存在 baomidou(苞米豆) 动态数据源，需要指定 baomidou_dynamic_data_source
+    #
+    # 项目中使用 sleuth 代理 jdbc 同时使用baomidou(苞米豆) 动态数据源，需要指定 sleuth_baomidou_dynamic_data_source_wrapper ，否则需要禁用 sleuth 中的 jdbc 代理
+    # 如果项目中使用到 sleuth 同时使用baomidou(苞米豆) 动态数据源，应该禁用 sleuth 中的 jdbc 代理，例如以下配置，否则 sql-interceptor-strategy: druid_filter 是不会添加druid过滤器多租户 SQL 解析
+    # spring:
+    #   sleuth:
+    #     jdbc:
+    #       enabled: false
     data-source-wrapper-type: baomidou_dynamic_data_source
     # 是否自定义数据源，默认是 false，true时会调用addCustomDataSourceProxySqlParser()方法，用于自定义数据源添加SQL解析器
     enable-custom-data-source: false
