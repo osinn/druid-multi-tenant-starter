@@ -67,13 +67,6 @@ public class TenantProperties {
     private boolean enableCustomDataSource;
 
     /**
-     * 是否存在 sleuth jdbc 代理
-     *
-     * @since 1.5.6
-     */
-    private boolean enabledSleuthJdbc = false;
-
-    /**
      * 是否存在包装代理数据源，如果有则需要指定类型
      *
      * @since 1.5.6
