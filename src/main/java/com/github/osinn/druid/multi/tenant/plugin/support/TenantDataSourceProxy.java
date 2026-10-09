@@ -6,12 +6,16 @@ import com.baomidou.dynamic.datasource.DynamicRoutingDataSource;
 import com.baomidou.dynamic.datasource.ds.ItemDataSource;
 import com.github.osinn.druid.multi.tenant.plugin.parser.DefaultSqlParser;
 import com.github.osinn.druid.multi.tenant.plugin.support.druid.RewriteSqlDruidFilter;
-import org.springframework.cloud.sleuth.instrument.jdbc.DataSourceWrapper;
 
 import javax.sql.DataSource;
 import java.util.Collections;
 import java.util.Map;
 
+/**
+ * 多租户数据源代理，用于给 baomidou 动态数据源下的 DruidDataSource 添加 druid 过滤器 SQL 解析器
+ *
+ * @author wency_cai
+ */
 public class TenantDataSourceProxy {
 
     private final DefaultSqlParser defaultSqlParser;
@@ -22,13 +26,6 @@ public class TenantDataSourceProxy {
         if (dataSource instanceof DynamicRoutingDataSource) {
             DynamicRoutingDataSource dynamicRoutingDataSource = (DynamicRoutingDataSource) dataSource;
             this.addProxyFilter(dynamicRoutingDataSource);
-        } else if (dataSource instanceof DataSourceWrapper) {
-            DataSourceWrapper dataSourceWrapper = (DataSourceWrapper) dataSource;
-            DataSource originalDataSource = dataSourceWrapper.getOriginalDataSource();
-            if (originalDataSource instanceof DynamicRoutingDataSource) {
-                DynamicRoutingDataSource dynamicRoutingDataSource = (DynamicRoutingDataSource) originalDataSource;
-                this.addProxyFilter(dynamicRoutingDataSource);
-            }
         }
     }
 

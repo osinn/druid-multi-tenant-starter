@@ -18,16 +18,10 @@ public enum SqlInterceptorStrategyEnum {
     mybatis_interceptor,
 
     /**
-     * 使用 druid 过滤器，前提是使用的数据源必须是 DruidDataSource 数据
+     * 使用 druid 过滤器，前提是使用的数据源必须是 DruidDataSource 数据源
      * <p>
-     * 如果项目中使用到 baomidou dynamic-datasource 多动态数据源 或 使用了 spring-cloud-starter-sleuth 且配置为
-     * <pre>
-     * spring:
-     *   sleuth:
-     *     jdbc:
-     *       enabled: true
-     * </pre>
-     * 需要 yml 配置 data-source-wrapper-type 指定类型，否则无法将 druid 过滤器 SQL 解析器添加到 DruidDataSource 数据源中
+     * 如果项目中使用到 baomidou(苞米豆) dynamic-datasource 动态数据源，需要 yml 配置 data-source-wrapper-type 指定
+     * 为 baomidou_dynamic_data_source，否则无法将 druid 过滤器 SQL 解析器添加到 DruidDataSource 数据源中
      */
     druid_filter
 }

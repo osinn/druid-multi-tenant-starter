@@ -7,16 +7,15 @@ import com.github.osinn.druid.multi.tenant.plugin.service.ITenantService;
 import com.github.osinn.druid.multi.tenant.plugin.support.*;
 import com.github.osinn.druid.multi.tenant.plugin.support.druid.DruidFilterTenantSqlInterceptorStrategy;
 import com.github.osinn.druid.multi.tenant.plugin.support.jpa.IJpaEntityManagerFactory;
-import com.github.osinn.druid.multi.tenant.plugin.support.jpa.JpaEntityManagerFactoryBoot2;
 import com.github.osinn.druid.multi.tenant.plugin.support.jpa.JpaEntityManagerFactoryBoot3;
 import com.github.osinn.druid.multi.tenant.plugin.support.jpa.JpaTenantSqlInterceptorStrategy;
 import com.github.osinn.druid.multi.tenant.plugin.support.mybatis.MybatisTenantSqlInterceptorStrategy;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 
 import java.util.List;
 
@@ -25,18 +24,10 @@ import java.util.List;
  *
  * @author wency_cai
  */
-@Configuration
+@AutoConfiguration
 @EnableConfigurationProperties(TenantProperties.class)
 @ConditionalOnProperty(value = TenantProperties.PREFIX + ".enable", havingValue = "true")
 public class MultiTenantAutoConfigure {
-
-    // Spring Boot 2: 存在 javax.persistence.EntityManager
-    @Bean
-    @ConditionalOnMissingBean
-    @ConditionalOnClass(name = "javax.persistence.EntityManager")
-    public IJpaEntityManagerFactory jpaEntityManagerFactoryBoot2() {
-        return new JpaEntityManagerFactoryBoot2();
-    }
 
     // Spring Boot 3+: 存在 jakarta.persistence.EntityManager
     @Bean

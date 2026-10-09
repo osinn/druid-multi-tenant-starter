@@ -7,9 +7,11 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 
 /**
+ * 租户服务抽象基类，供使用方继承后自行实现租户信息的获取逻辑。
+ *
  * @author wency_cai
  */
-public abstract class TenantApplicationContext implements ApplicationContextAware, ITenantService {
+public abstract class AbstractTenantService implements ApplicationContextAware, ITenantService {
 
     private static ApplicationContext context;
 

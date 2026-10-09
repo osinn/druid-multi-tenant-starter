@@ -12,7 +12,10 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 /**
  * sql解析器实现
@@ -21,6 +24,16 @@ import java.util.List;
  */
 @Slf4j
 public class DefaultSqlParser implements SqlParser {
+
+    /**
+     * CTE 名称不是真实表，引用它时不应该再拼接租户条件；
+     * <ul>
+     *     <li>非递归 CTE 的别名对它自身的定义体不可见（体内同名标识符指向真实表），只对其后定义的 CTE 以及主语句可见；</li>
+     *     <li>递归 CTE（with recursive）的别名对自身定义体也可见；</li>
+     *     <li>内层 with 的别名出了内层语句即失效。</li>
+     * </ul>
+     */
+    private static final ThreadLocal<Set<String>> CTE_ALIASES = new ThreadLocal<>();
 
     /**
      * 处理多租户信息处理器
@@ -39,6 +52,10 @@ public class DefaultSqlParser implements SqlParser {
 
     @Override
     public String setTenantParameter(String url, String sql, Object paramTenantId) {
+
+        if (sql == null || sql.length() == 0) {
+            return sql;
+        }
 
         String customizeParserSQL = tenantService.customizeParser(sql, paramTenantId);
 
@@ -60,23 +77,23 @@ public class DefaultSqlParser implements SqlParser {
 
         List<SQLStatement> statementList = SQLUtils.parseStatements(sql, dbType);
 
-        StringBuilder stringBuilder = new StringBuilder();
-        // 支持多语句情况
-        for (SQLStatement statement : statementList) {
-            if (statement instanceof SQLSelectStatement) {
-                SQLSelectStatement sqlSelectStatement = (SQLSelectStatement) statement;
-                processSelectBody(sqlSelectStatement.getSelect().getQuery(), paramTenantId);
-            } else if (statement instanceof SQLInsertStatement) {
-                processInsert((SQLInsertStatement) statement, paramTenantId);
-            } else if (statement instanceof SQLUpdateStatement) {
-                processUpdate((SQLUpdateStatement) statement, paramTenantId);
-            } else if (statement instanceof SQLDeleteStatement) {
-                processDelete((SQLDeleteStatement) statement, paramTenantId);
+        Set<String> previousCteAliases = CTE_ALIASES.get();
+        String parserSql;
+        try {
+            StringBuilder stringBuilder = new StringBuilder();
+            // 支持多语句情况
+            for (SQLStatement statement : statementList) {
+                processStatement(statement, paramTenantId);
+                stringBuilder.append(statement.toString());
             }
-            stringBuilder.append(statement.toString());
+            parserSql = stringBuilder.toString();
+        } finally {
+            if (previousCteAliases == null) {
+                CTE_ALIASES.remove();
+            } else {
+                CTE_ALIASES.set(previousCteAliases);
+            }
         }
-
-        String parserSql = stringBuilder.toString();
 
         String afterSql = tenantService.after(parserSql, paramTenantId);
         if (afterSql != null && afterSql.length() > 0) {
@@ -84,6 +101,113 @@ public class DefaultSqlParser implements SqlParser {
         } else {
             return parserSql;
         }
+    }
+
+    /**
+     * 处理单条 SQL 语句（含 with 子句）
+     */
+    private void processStatement(SQLStatement statement, Object paramTenantId) {
+        if (statement instanceof SQLSelectStatement) {
+            processSelect(((SQLSelectStatement) statement).getSelect(), paramTenantId);
+        } else if (statement instanceof SQLInsertStatement) {
+            SQLInsertStatement insert = (SQLInsertStatement) statement;
+            processWithScope(insert.getWith(), paramTenantId, () -> processInsert(insert, paramTenantId));
+        } else if (statement instanceof SQLUpdateStatement) {
+            SQLUpdateStatement update = (SQLUpdateStatement) statement;
+            processWithScope(update.getWith(), paramTenantId, () -> processUpdate(update, paramTenantId));
+        } else if (statement instanceof SQLDeleteStatement) {
+            SQLDeleteStatement delete = (SQLDeleteStatement) statement;
+            processWithScope(delete.getWith(), paramTenantId, () -> processDelete(delete, paramTenantId));
+        }
+    }
+
+    /**
+     * 处理带 with 子句的查询：先让 with 中定义的 CTE 别名按顺序生效，再处理查询主体，
+     * 结束后回收本层新增的别名。
+     */
+    private void processSelect(SQLSelect select, Object paramTenantId) {
+        if (select == null) {
+            return;
+        }
+        processWithScope(select.getWithSubQuery(), paramTenantId,
+                () -> processSelectBody(select.getQuery(), paramTenantId));
+    }
+
+    /**
+     * 在 with 子句定义的作用域内执行语句主体。
+     * <p>
+     * with 中定义的别名对「其后的 CTE」和「主语句」可见，出了本层立即失效。
+     *
+     * @param withSubQuery  with 子句
+     * @param paramTenantId mapper 接口传入的租户ID
+     * @param statementBody 语句主体处理逻辑
+     */
+    private void processWithScope(SQLWithSubqueryClause withSubQuery, Object paramTenantId, Runnable statementBody) {
+        // 只有创建了 ThreadLocal 的那一层负责清理，
+        // 否则内层空作用域会把别名集合摘掉，导致外层后续新增的别名写进孤儿集合而全部失效
+        boolean ownsAliasContext = CTE_ALIASES.get() == null;
+        Set<String> visibleAliases = cteAliases();
+        Set<String> addedAliases = new HashSet<>();
+        try {
+            processWithClause(withSubQuery, paramTenantId, addedAliases);
+            statementBody.run();
+        } finally {
+            visibleAliases.removeAll(addedAliases);
+            if (ownsAliasContext && visibleAliases.isEmpty()) {
+                CTE_ALIASES.remove();
+            }
+        }
+    }
+
+    /**
+     * 按定义顺序处理 with 子句，CTE 内部的真实表同样需要拼接租户条件。
+     *
+     * @param withSubQuery  with 子句
+     * @param paramTenantId mapper 接口传入的租户ID
+     * @param addedAliases  本层新增的别名，用于离开作用域时回收
+     */
+    private void processWithClause(SQLWithSubqueryClause withSubQuery, Object paramTenantId, Set<String> addedAliases) {
+        if (withSubQuery == null || withSubQuery.getEntries() == null || withSubQuery.getEntries().isEmpty()) {
+            return;
+        }
+        Set<String> visibleAliases = cteAliases();
+        // 递归 CTE 的名称对自身定义体也可见
+        boolean recursive = Boolean.TRUE.equals(withSubQuery.getRecursive());
+        for (SQLWithSubqueryClause.Entry entry : withSubQuery.getEntries()) {
+            if (entry == null) {
+                continue;
+            }
+            String alias = toCteKey(entry.getAlias());
+            if (recursive && alias != null && visibleAliases.add(alias)) {
+                addedAliases.add(alias);
+            }
+            processSelect(entry.getSubQuery(), paramTenantId);
+            if (!recursive && alias != null && visibleAliases.add(alias)) {
+                addedAliases.add(alias);
+            }
+        }
+    }
+
+    /**
+     * 获取当前线程的 CTE 别名集合（不存在则创建）
+     */
+    private Set<String> cteAliases() {
+        Set<String> aliases = CTE_ALIASES.get();
+        if (aliases == null) {
+            aliases = new HashSet<>();
+            CTE_ALIASES.set(aliases);
+        }
+        return aliases;
+    }
+
+    /**
+     * CTE 别名比较用的键：去掉引用符号并忽略大小写
+     */
+    private static String toCteKey(String name) {
+        if (name == null) {
+            return null;
+        }
+        return removeIdentifierQuote(name).toLowerCase(Locale.ROOT);
     }
 
     @Override
@@ -151,6 +275,8 @@ public class DefaultSqlParser implements SqlParser {
 
                 SQLExpr tenantCondition = getTenantCondition(tableName, right.getAlias(), joinTable.getCondition(), paramTenantId);
                 if (tenantCondition != null) {
+                    // 原 on 条件顶层是 OR/XOR 时先加括号，避免与 AND 组合时语义被改变
+                    parenthesizeIfLogicalOr(joinTable.getCondition());
                     joinTable.addCondition(tenantCondition);
                 }
                 SQLExpr condition = joinTable.getCondition();
@@ -181,10 +307,9 @@ public class DefaultSqlParser implements SqlParser {
                 sqlSelectQueryBlock.setWhere(newWhereCondition);
             } else if (table instanceof SQLSubqueryTableSource) {
                 // 例如 "select a,b from (select * from table_a) temp where temp.a = 'a';"
-                // 子查询作为表
+                // 子查询作为表，其自身也可能带 with 子句
                 SQLSubqueryTableSource subQueryTable = (SQLSubqueryTableSource) table;
-                SQLSelectQuery query = subQueryTable.getSelect().getQuery();
-                processSelectBody(query, paramTenantId);
+                processSelect(subQueryTable.getSelect(), paramTenantId);
             } else if (table instanceof SQLUnionQueryTableSource) {
                 SQLUnionQueryTableSource sqlUnionQueryTableSource = (SQLUnionQueryTableSource) table;
                 // 处理union的查询语句
@@ -201,35 +326,35 @@ public class DefaultSqlParser implements SqlParser {
 
     @Override
     public void processInsert(SQLInsertStatement insert, Object paramTenantId) {
-        boolean isInsertFieldExistTenantIdColumn = false;
         String tenantIdColumn = this.tenantInfoHandler.getTenantIdColumn();
         List<SQLExpr> columns = insert.getColumns();
+
+        // insert 语句中是否包含租户ID字段, 例如 INSERT INTO role (id, `name`, tenant_id)
+        boolean isInsertFieldExistTenantIdColumn = false;
         for (SQLExpr column : columns) {
-            if (isContainsTenantIdCondition(column)) {
-                // insert 语句中包含tenant_id字段，也要检查是否使用了insert select语法
-                this.handlerInsertSelect(insert, tenantIdColumn, paramTenantId);
-                // 包含租户ID不再处理
+            if (isTenantIdColumnExpr(column)) {
+                isInsertFieldExistTenantIdColumn = true;
+                break;
+            }
+        }
+
+        if (!isInsertFieldExistTenantIdColumn) {
+            String tableName = insert.getTableName().toString();
+            if (ignoreTable(tableName)) {
                 return;
             }
-            // insert 语句中是否包含租户ID字段, 例如 INSERT INTO role (id, `name`, tenant_id)
-            if (column.toString().contains(tenantIdColumn)) {
-                isInsertFieldExistTenantIdColumn = true;
+            List<Object> tenantIds = this.getTenantId(paramTenantId);
+            if (tenantIds.size() == 0) {
+                return;
+            }
+            // 如果insert 没有指定租户ID字段，认为是插入全部字段包括租户ID，不需要额外处理添加租户ID字段，否则需要添加
+            if (!columns.isEmpty()) {
+                insert.addColumn(new SQLIdentifierExpr(tenantIdColumn));
+                Object tenantId = tenantIds.get(0);
+                insert.getValuesList().forEach(valuesClause -> valuesClause.addValue(tenantId));
             }
         }
-        String tableName = insert.getTableName().toString();
-        if (ignoreTable(tableName)) {
-            return;
-        }
-        List<Object> tenantIds = this.getTenantId(paramTenantId);
-        if (tenantIds.size() == 0) {
-            return;
-        }
-        // 如果insert 没有指定租户ID字段，认为是插入全部字段包括租户ID，不需要额外处理添加租户ID字段，否则需要添加
-        if (!columns.isEmpty() && !isInsertFieldExistTenantIdColumn) {
-            insert.addColumn(new SQLIdentifierExpr(this.tenantInfoHandler.getTenantIdColumn()));
-            Object tenantId = tenantIds.get(0);
-            insert.getValuesList().forEach(valuesClause -> valuesClause.addValue(tenantId));
-        }
+        // insert 语句中包含tenant_id字段，也要检查是否使用了insert select语法
         this.handlerInsertSelect(insert, tenantIdColumn, paramTenantId);
     }
 
@@ -250,6 +375,8 @@ public class DefaultSqlParser implements SqlParser {
             }
             SQLExpr tenantCondition = getTenantCondition(tableName, right.getAlias(), joinTable.getCondition(), paramTenantId);
             if (tenantCondition != null) {
+                // 原 on 条件顶层是 OR/XOR 时先加括号，避免与 AND 组合时语义被改变
+                parenthesizeIfLogicalOr(joinTable.getCondition());
                 joinTable.addCondition(tenantCondition);
             }
 
@@ -278,6 +405,8 @@ public class DefaultSqlParser implements SqlParser {
 
         SQLExpr tenantCondition = getTenantCondition(tableName, alias, update.getWhere(), paramTenantId);
         if (tenantCondition != null) {
+            // 原 where 顶层是 OR/XOR 时先加括号，避免与 AND 组合时语义被改变
+            parenthesizeIfLogicalOr(update.getWhere());
             update.addCondition(tenantCondition);
         }
         SQLExpr where = update.getWhere();
@@ -308,6 +437,8 @@ public class DefaultSqlParser implements SqlParser {
             }
             SQLExpr tenantCondition = getTenantCondition(tableName, right.getAlias(), joinTable.getCondition(), paramTenantId);
             if (tenantCondition != null) {
+                // 原 on 条件顶层是 OR/XOR 时先加括号，避免与 AND 组合时语义被改变
+                parenthesizeIfLogicalOr(joinTable.getCondition());
                 joinTable.addCondition(tenantCondition);
             }
             SQLExpr condition = joinTable.getCondition();
@@ -336,6 +467,8 @@ public class DefaultSqlParser implements SqlParser {
 
         SQLExpr tenantCondition = getTenantCondition(tableName, alias, delete.getWhere(), paramTenantId);
         if (tenantCondition != null) {
+            // 原 where 顶层是 OR/XOR 时先加括号，避免与 AND 组合时语义被改变
+            parenthesizeIfLogicalOr(delete.getWhere());
             delete.addCondition(tenantCondition);
         }
         SQLExpr where = delete.getWhere();
@@ -370,10 +503,9 @@ public class DefaultSqlParser implements SqlParser {
             joinCondition(left, paramTenantId);
             joinCondition(right, paramTenantId);
         } else if (sqlTableSource instanceof SQLSubqueryTableSource) {
-            // 子查询作为表
+            // 子查询作为表，其自身也可能带 with 子句
             SQLSubqueryTableSource subQueryTable = (SQLSubqueryTableSource) sqlTableSource;
-            SQLSelectQuery query = subQueryTable.getSelect().getQuery();
-            processSelectBody(query, paramTenantId);
+            processSelect(subQueryTable.getSelect(), paramTenantId);
         } else if (sqlTableSource instanceof SQLUnionQueryTableSource) {
             SQLUnionQueryTableSource sqlUnionQueryTableSource = (SQLUnionQueryTableSource) sqlTableSource;
             // 处理union的查询语句
@@ -396,6 +528,8 @@ public class DefaultSqlParser implements SqlParser {
             if (tenantCondition == null) {
                 return where;
             }
+            // 原条件顶层是 OR/XOR 时必须先加括号，否则 AND 优先级更高会改变语义（导致租户隔离失效）
+            parenthesizeIfLogicalOr(where);
             // 构建新的 SQLBinaryOpExpr
             SQLBinaryOpExpr sqlBinaryOpExpr = new SQLBinaryOpExpr();
             sqlBinaryOpExpr.setOperator(SQLBinaryOperator.BooleanAnd);
@@ -411,29 +545,54 @@ public class DefaultSqlParser implements SqlParser {
     }
 
     /**
+     * 条件顶层是 OR/XOR 时标记为带括号，避免与 AND 组合时因运算符优先级改变语义。
+     *
+     * @param condition 原始条件
+     */
+    private void parenthesizeIfLogicalOr(SQLExpr condition) {
+        if (condition instanceof SQLBinaryOpExpr) {
+            SQLBinaryOperator operator = ((SQLBinaryOpExpr) condition).getOperator();
+            if (SQLBinaryOperator.BooleanOr == operator || SQLBinaryOperator.BooleanXor == operator) {
+                ((SQLBinaryOpExpr) condition).setParenthesized(true);
+            }
+        }
+    }
+
+    /**
      * 处理in条件查询
      *
      * @param sqlExpr
      */
     private void whereIn(SQLExpr sqlExpr, Object paramTenantId) {
+        if (sqlExpr == null) {
+            return;
+        }
         if (sqlExpr instanceof SQLInSubQueryExpr) {
-            SQLSelect subQuery = ((SQLInSubQueryExpr) sqlExpr).getSubQuery();
-            SQLSelectQueryBlock selectQueryBlock = subQuery.getQueryBlock();
-            if (selectQueryBlock != null) {
-                processSelectBody(selectQueryBlock, paramTenantId);
-            } else {
-                SQLSelectQuery query = subQuery.getQuery();
-                if (query instanceof SQLUnionQuery) {
-                    // 处理union的查询语句
-                    SQLUnionQuery sqlUnionQuery = (SQLUnionQuery) query;
-                    unionQuery(sqlUnionQuery, paramTenantId);
-                }
-            }
+            processSubQuery(((SQLInSubQueryExpr) sqlExpr).getSubQuery(), paramTenantId);
+        } else if (sqlExpr instanceof SQLExistsExpr) {
+            // 处理 exists 查询，例如 where exists (select 1 from role r where r.id = u.role_id)
+            processSubQuery(((SQLExistsExpr) sqlExpr).getSubQuery(), paramTenantId);
+        } else if (sqlExpr instanceof SQLQueryExpr) {
+            // 处理标量子查询，例如 where (select count(*) from role r) > 1
+            processSubQuery(((SQLQueryExpr) sqlExpr).getSubQuery(), paramTenantId);
+        } else if (sqlExpr instanceof SQLNotExpr) {
+            // 处理 not 表达式，例如 not exists (...)
+            this.whereIn(((SQLNotExpr) sqlExpr).getExpr(), paramTenantId);
         } else if (sqlExpr instanceof SQLBinaryOpExpr) {
             SQLBinaryOpExpr sqlBinaryOpExpr = (SQLBinaryOpExpr) sqlExpr;
             this.whereIn(sqlBinaryOpExpr.getLeft(), paramTenantId);
             this.whereIn(sqlBinaryOpExpr.getRight(), paramTenantId);
         }
+    }
+
+    /**
+     * 处理子查询（in 子查询 / exists 子查询 / 标量子查询）
+     *
+     * @param subQuery 子查询
+     */
+    private void processSubQuery(SQLSelect subQuery, Object paramTenantId) {
+        // 子查询自身也可能带 with 子句，统一走带作用域的入口
+        processSelect(subQuery, paramTenantId);
     }
 
     /**
@@ -519,32 +678,72 @@ public class DefaultSqlParser implements SqlParser {
      * @return 判断结果
      */
     private boolean isContainsTenantIdCondition(SQLExpr where) {
-        if (!(where instanceof SQLBinaryOpExpr)) {
-            if (where instanceof SQLPropertyExpr || where instanceof SQLIdentifierExpr) {
-                return String.valueOf(where).contains(this.tenantInfoHandler.getTenantIdColumn());
-            }
+        if (where == null) {
             return false;
         }
-        SQLBinaryOpExpr binaryOpExpr = (SQLBinaryOpExpr) where;
-        SQLExpr left = binaryOpExpr.getLeft();
-        SQLExpr right = binaryOpExpr.getRight();
-        // 是否包含tenant_id 为查询条件
-        boolean isContainsTenantIdCondition = false;
-        if (left instanceof SQLBinaryOpExpr || left instanceof SQLPropertyExpr) {
-            isContainsTenantIdCondition = String.valueOf(left).contains(this.tenantInfoHandler.getTenantIdColumn());
+        // 精确匹配租户ID列名，避免 tenant_id_flag 这类列名被误判为已有租户条件
+        if (isTenantIdColumnExpr(where)) {
+            return true;
         }
-        if (!isContainsTenantIdCondition && right instanceof SQLBinaryOpExpr) {
-            isContainsTenantIdCondition = String.valueOf(right).contains(this.tenantInfoHandler.getTenantIdColumn());
+        if (where instanceof SQLBinaryOpExpr) {
+            SQLBinaryOpExpr binaryOpExpr = (SQLBinaryOpExpr) where;
+            return isContainsTenantIdCondition(binaryOpExpr.getLeft())
+                    || isContainsTenantIdCondition(binaryOpExpr.getRight());
         }
+        if (where instanceof SQLInListExpr) {
+            return isTenantIdColumnExpr(((SQLInListExpr) where).getExpr());
+        }
+        if (where instanceof SQLInSubQueryExpr) {
+            return isTenantIdColumnExpr(((SQLInSubQueryExpr) where).getExpr());
+        }
+        if (where instanceof SQLNotExpr) {
+            return isContainsTenantIdCondition(((SQLNotExpr) where).getExpr());
+        }
+        return false;
+    }
 
-        if (!isContainsTenantIdCondition && left instanceof SQLIdentifierExpr) {
-            isContainsTenantIdCondition = String.valueOf(left).equals(this.tenantInfoHandler.getTenantIdColumn());
+    /**
+     * 判断表达式是否为租户ID字段列
+     *
+     * @param sqlExpr 列表达式
+     * @return 是否为租户ID字段列
+     */
+    private boolean isTenantIdColumnExpr(SQLExpr sqlExpr) {
+        String tenantIdColumn = this.tenantInfoHandler.getTenantIdColumn();
+        if (tenantIdColumn == null || sqlExpr == null) {
+            return false;
         }
+        String columnName = null;
+        if (sqlExpr instanceof SQLIdentifierExpr) {
+            columnName = ((SQLIdentifierExpr) sqlExpr).getName();
+        } else if (sqlExpr instanceof SQLPropertyExpr) {
+            columnName = ((SQLPropertyExpr) sqlExpr).getName();
+        }
+        if (columnName == null) {
+            return false;
+        }
+        return tenantIdColumn.equalsIgnoreCase(removeIdentifierQuote(columnName));
+    }
 
-        if (!isContainsTenantIdCondition && right instanceof SQLIdentifierExpr) {
-            isContainsTenantIdCondition = String.valueOf(right).equals(this.tenantInfoHandler.getTenantIdColumn());
+    /**
+     * 去掉列名上的引用符号，例如 `tenant_id`、"tenant_id"、[tenant_id]
+     *
+     * @param name 列名
+     * @return 去掉引用符号后的列名
+     */
+    private static String removeIdentifierQuote(String name) {
+        if (name == null) {
+            return null;
         }
-        return isContainsTenantIdCondition;
+        String result = name.trim();
+        if (result.length() >= 2) {
+            if ((result.startsWith("`") && result.endsWith("`"))
+                    || (result.startsWith("\"") && result.endsWith("\""))
+                    || (result.startsWith("[") && result.endsWith("]"))) {
+                result = result.substring(1, result.length() - 1);
+            }
+        }
+        return result;
     }
 
     /**
@@ -626,7 +825,14 @@ public class DefaultSqlParser implements SqlParser {
         if (tableName == null) {
             return false;
         }
+        // CTE(with 子句) 名称不是真实表，当前作用域内引用它时不需要拼接租户条件
+        Set<String> cteAliases = CTE_ALIASES.get();
+        if (cteAliases != null && cteAliases.contains(toCteKey(tableName))) {
+            return true;
+        }
+
         tableName = tableName.replace("`", "");
+
         List<String> ignoreTableNames = tenantInfoHandler.ignoreTableName();
 
         boolean ignoreTable = ignoreTableNamePrefix(tableName);
@@ -702,7 +908,9 @@ public class DefaultSqlParser implements SqlParser {
             return false;
         }
         for (String ignoreDynamicDatasourceItem : dynamicDatasourceList) {
-            return ignoreDynamicDatasource.equals(ignoreDynamicDatasourceItem);
+            if (ignoreDynamicDatasource.equals(ignoreDynamicDatasourceItem)) {
+                return true;
+            }
         }
         return false;
     }

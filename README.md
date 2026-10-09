@@ -4,16 +4,16 @@
     <a href="https://github.com/osinn/druid-multi-tenant-starter/releases"><img src="https://badgen.net/github/release/osinn/druid-multi-tenant-starter?cache=300" ></a>
     <a href="https://github.com/osinn/druid-multi-tenant-starter"><img src="https://badgen.net/github/stars/osinn/druid-multi-tenant-starter" ></a>
     <a href="https://github.com/osinn/druid-multi-tenant-starter"><img src="https://badgen.net/github/forks/osinn/druid-multi-tenant-starter" ></a>
-    <a href="https://github.com/osinn/druid-multi-tenant-starter"><img src="https://img.shields.io/badge/JDK-1.8+-green.svg?color=blue" ></a>
-    <a href="https://github.com/osinn/druid-multi-tenant-starter"><img src="https://img.shields.io/badge/Spring boot-2.x & 3.x & 4.x-green.svg?color=blue" ></a>
+    <a href="https://github.com/osinn/druid-multi-tenant-starter"><img src="https://img.shields.io/badge/JDK-17+-green.svg?color=blue" ></a>
+    <a href="https://github.com/osinn/druid-multi-tenant-starter"><img src="https://img.shields.io/badge/Spring boot-3.5+-green.svg?color=blue" ></a>
 </p>
 
 > 目标多租户插件，快速集成，开箱即用，支持单个租户以及多个租户，基于alibaba druid 解析SQL，开发过程中只需要像平时一样写SQL语句即可，执行SQL最终会被拦截串改，最终把租户字段添加到SQL语句中，生成新的SQL语句，此过程你无需关心是如何添加。
 
 **需要注意的是，插件最终会认为每个表都会存在租户ID字段，所以，每个表都应该出现租户ID字段，否则需要在配置中明确指出需要忽略的表，忽略的表将不会拼接租户ID字段查询条件，临时表亦是如此(否则临时表结果集中需要出现租户ID字段)**
 
-- jdk1.8+
-- 支持 Spring boot 2.x & Spring boot 3.x & Spring boot 4.x
+- jdk17+
+- 仅支持 Spring boot 3.x 及以上版本（当前基于 Spring boot 3.5.9 构建）
 - 支持JPA、Mybatis等ORM框架
 - 项目地址：[https://github.com/osinn/druid-multi-tenant-starter](https://github.com/osinn/druid-multi-tenant-starter)
 - 演示地址：[https://github.com/osinn/druid-multi-tenant-demo](https://github.com/osinn/druid-multi-tenant-demo)
@@ -32,7 +32,7 @@
 - [x] 支持指定`别名`忽略SQL语句添加tenantId字段条件
 - [x] 支持重写`skipParser`方法，通过获取当前线程变量判断是否`跳过SQL语句解析`添加tenantId字段条件，需要开发者自行实现逻辑判断
 - [x] 支持指定`多数据源`忽略SQL语句添加tenantId字段条件，需要开发者重写`ignoreDynamicDatasource`方法提供获取当前执行的数据源名称
-- [x] 支持`@IgnoreTenantIdField`注解从`1.5.6`开始支持使用在任意方法上，`1.5.5`及以下版本仅支持使用在mybatis Mapper接口方法上，需要在yml中配置`enable-pointcut-advisor-ignore-tenant-id: true`开启支持
+- [x] 支持`@IgnoreTenantIdField`注解默认仅支持使用在mybatis Mapper接口方法上，若想支持使用在任意方法上，需要在yml中配置`enable-pointcut-advisor-ignore-tenant-id: true`开启支持
 
 # 快速开始
 - 在`Spring Boot`项目中引入以下依赖
@@ -47,7 +47,6 @@
 
 # 配置
 ```
---基础配置 1.5.6版本开始 mybatis.tenant.config 改为 multi-tenant.config
 multi-tenant:
   config:
     # 是否启用多租户插件
@@ -82,14 +81,7 @@ multi-tenant:
     ignore-dynamic-datasource:
       - demoDataSource # 内部全等判断
     # 数据源包装类型, 默认是 null
-    #项目中存在 baomidou(苞米豆) 动态数据源，需要指定 baomidou_dynamic_data_source
-    #
-    # 项目中使用 sleuth 代理 jdbc 同时使用baomidou(苞米豆) 动态数据源，需要指定 sleuth_baomidou_dynamic_data_source_wrapper ，否则需要禁用 sleuth 中的 jdbc 代理
-    # 如果项目中使用到 sleuth 同时使用baomidou(苞米豆) 动态数据源，应该禁用 sleuth 中的 jdbc 代理，例如以下配置，否则 sql-interceptor-strategy: druid_filter 是不会添加druid过滤器多租户 SQL 解析
-    # spring:
-    #   sleuth:
-    #     jdbc:
-    #       enabled: false
+    # 项目中存在 baomidou(苞米豆) 动态数据源，需要指定 baomidou_dynamic_data_source，否则 sql-interceptor-strategy: druid_filter 是不会添加druid过滤器多租户 SQL 解析
     data-source-wrapper-type: baomidou_dynamic_data_source
     # 是否自定义数据源，默认是 false，true时会调用addCustomDataSourceProxySqlParser()方法，用于自定义数据源添加SQL解析器
     enable-custom-data-source: false
@@ -98,7 +90,6 @@ multi-tenant:
 - 执行SQL中存在临时表可以约束指定 `ignore-match-table-alias` 匹配临时表别名来忽略临时表添加租户ID查询条件
 
 # 实现提供获取多租户值接口
-- 1.5.5及以下版本需要实现`ITenantService`接口，1.5.6版本开始需要继承`TenantApplicationContext`抽象类提供获取多租户ID值
 
 ### 基础方法
 ```
@@ -106,10 +97,9 @@ multi-tenant:
  * 演示：提供多租户ID服务接口
  * 
  * @author wency_cai
- * @since 1.5.6
  */
 @Service
-public class TenantServiceImpl extends TenantApplicationContext {
+public class TenantServiceImpl extends AbstractTenantService {
 
     @Override
     public List<Object> getTenantIds() {
@@ -128,10 +118,9 @@ public class TenantServiceImpl extends TenantApplicationContext {
  *
  * @author wency_cai
  * 
- * @since 1.5.6 开始需要继承 TenantApplicationContext 抽象类提供获取多租户ID值
  */
 @Service
-public class TenantServiceImpl extends TenantApplicationContext {
+public class TenantServiceImpl extends AbstractTenantService {
 
     @Override
     public List<Object> getTenantIds() {

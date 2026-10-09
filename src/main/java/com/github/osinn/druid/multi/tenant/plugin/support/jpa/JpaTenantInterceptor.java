@@ -1,6 +1,6 @@
 package com.github.osinn.druid.multi.tenant.plugin.support.jpa;
 
-import com.github.osinn.druid.multi.tenant.plugin.context.TenantApplicationContext;
+import com.github.osinn.druid.multi.tenant.plugin.context.AbstractTenantService;
 import com.github.osinn.druid.multi.tenant.plugin.parser.DefaultSqlParser;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.resource.jdbc.spi.StatementInspector;
@@ -32,7 +32,7 @@ public class JpaTenantInterceptor implements StatementInspector {
     }
 
     private void initBean() {
-        jpaEntityManagerFactory = TenantApplicationContext.getBean(IJpaEntityManagerFactory.class);
-        defaultSqlParser = TenantApplicationContext.getBean(DefaultSqlParser.class);
+        jpaEntityManagerFactory = AbstractTenantService.getBean(IJpaEntityManagerFactory.class);
+        defaultSqlParser = AbstractTenantService.getBean(DefaultSqlParser.class);
     }
 }

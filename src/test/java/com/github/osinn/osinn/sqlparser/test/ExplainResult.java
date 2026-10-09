@@ -494,7 +494,7 @@ public class ExplainResult {
                         "WHERE u.tenant_id = 1540616714700591104");
         EXPLAIN_RESULT.put(sql36,
                 "UPDATE user\n" +
-                        "SET name = CASE \n" +
+                        "SET name = CASE\n" +
                         "\tWHEN id = 1 THEN 'name1'\n" +
                         "\tWHEN id = 2 THEN 'name2'\n" +
                         "\tWHEN id = 3 THEN 'name3'\n" +

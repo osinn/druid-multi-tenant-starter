@@ -8,7 +8,6 @@ import com.github.osinn.druid.multi.tenant.plugin.enums.DataSourceWrapperEnum;
 import com.github.osinn.druid.multi.tenant.plugin.parser.DefaultSqlParser;
 import com.github.osinn.druid.multi.tenant.plugin.starter.TenantProperties;
 import com.github.osinn.druid.multi.tenant.plugin.support.druid.RewriteSqlDruidFilter;
-import org.springframework.cloud.sleuth.instrument.jdbc.DataSourceWrapper;
 
 import javax.sql.DataSource;
 import java.util.Collections;
@@ -22,19 +21,9 @@ import java.util.Map;
 public class DataSourceHelp {
 
     public static void checkDataSource(Object bean, DefaultSqlParser defaultSqlParser, TenantProperties tenantProperties) {
-        if (DataSourceWrapperEnum.BAOMIDOU_DYNAMIC_DATA_SOURCE.equals(tenantProperties.getDataSourceWrapperType())) {
-            if (bean instanceof DynamicRoutingDataSource) {
-                addProxyFilter((DynamicRoutingDataSource) bean, defaultSqlParser);
-            }
-        } else if (DataSourceWrapperEnum.SLEUTH_BAOMIDOU_DYNAMIC_DATA_SOURCE_WRAPPER.equals(tenantProperties.getDataSourceWrapperType())) {
-            if (bean instanceof DataSourceWrapper) {
-                DataSourceWrapper dataSourceWrapper = (DataSourceWrapper) bean;
-                DataSource originalDataSource = dataSourceWrapper.getOriginalDataSource();
-                if (originalDataSource instanceof DynamicRoutingDataSource) {
-                    DynamicRoutingDataSource dynamicRoutingDataSource = (DynamicRoutingDataSource) originalDataSource;
-                    addProxyFilter(dynamicRoutingDataSource, defaultSqlParser);
-                }
-            }
+        if (DataSourceWrapperEnum.BAOMIDOU_DYNAMIC_DATA_SOURCE.equals(tenantProperties.getDataSourceWrapperType())
+                && bean instanceof DynamicRoutingDataSource) {
+            addProxyFilter((DynamicRoutingDataSource) bean, defaultSqlParser);
         }
     }
 

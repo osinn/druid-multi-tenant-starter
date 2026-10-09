@@ -1,6 +1,6 @@
 package com.github.osinn.druid.multi.tenant.plugin.support.jpa;
 
-import com.github.osinn.druid.multi.tenant.plugin.context.TenantApplicationContext;
+import com.github.osinn.druid.multi.tenant.plugin.context.AbstractTenantService;
 import jakarta.persistence.EntityManagerFactory;
 
 import javax.sql.DataSource;
@@ -15,7 +15,7 @@ import java.sql.SQLException;
 public class JpaEntityManagerFactoryBoot3 implements IJpaEntityManagerFactory {
     @Override
     public String getDataSourceUrl() {
-        EntityManagerFactory emf = TenantApplicationContext.getBean(EntityManagerFactory.class);
+        EntityManagerFactory emf = AbstractTenantService.getBean(EntityManagerFactory.class);
         DataSource dataSource = (DataSource) emf.getProperties().get("hibernate.connection.datasource");
         String url;
         try (Connection connection = dataSource.getConnection()) {
